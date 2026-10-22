@@ -5,7 +5,8 @@
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bungee&family=M+PLUS+Rounded+1c:wght@500;800&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bungee&family=M+PLUS+Rounded+1c:wght@500;800&display=swap" media="print" onload="this.media='all'">
+<noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bungee&family=M+PLUS+Rounded+1c:wght@500;800&display=swap"></noscript>
 <style>
 :root {
   --night: #071a1f;
@@ -58,7 +59,7 @@ body {
   text-align: center;
   font-variant-numeric: tabular-nums;
 }
-.meter span { display: block; font-size: 9px; font-weight: 800; letter-spacing: .12em; color: var(--muted); white-space: nowrap; }
+.meter span { display: block; font-size: 12px; font-weight: 800; letter-spacing: .12em; color: var(--muted); white-space: nowrap; }
 .meter b { font-family: var(--display); font-weight: 400; font-size: 19px; line-height: 1.1; color: var(--butter); }
 .led {
   flex: 1;
@@ -76,6 +77,7 @@ body {
   white-space: nowrap;
   overflow: hidden;
 }
+.led.long { white-space: normal; line-height: 1.1; text-align: center; }
 .icon {
   flex: none;
   width: 44px;
@@ -94,11 +96,14 @@ body {
 .icon[aria-pressed="true"] .mute-x { display: none; }
 .stage { position: relative; flex: 1; min-height: 220px; }
 .stage canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; outline: none; }
+.stage #fx { pointer-events: none; }
 .toast {
   position: absolute;
   left: 50%;
   top: 6px;
+  width: max-content;
   max-width: calc(100% - 16px);
+  box-sizing: border-box;
   transform: translate(-50%, -6px);
   padding: 8px 14px;
   border-radius: 999px;
@@ -113,6 +118,10 @@ body {
   transition: opacity .2s, transform .2s;
 }
 .toast.on { opacity: 1; transform: translate(-50%, 0); }
+.toast .big { display: block; font: 400 18px var(--display); letter-spacing: .04em; }
+.toast .big + span { display: block; }
+.pop { display: inline-block; animation: pop .3s ease-out; }
+@keyframes pop { 50% { transform: scale(1.35); } }
 .ledge {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
@@ -190,7 +199,7 @@ body {
 .coin.free { background: var(--butter); color: var(--cab-ink); box-shadow: 0 4px 0 #8f6a12; }
 .coin.free::before { display: none; }
 .coin:disabled { opacity: .5; cursor: default; }
-.mid small { text-align: center; font-size: 11px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mid small { text-align: center; font-size: 12px; line-height: 1.25; color: var(--muted); text-wrap: balance; overflow-wrap: anywhere; }
 .drop {
   width: 84px;
   height: 84px;
@@ -205,16 +214,25 @@ body {
   cursor: pointer;
 }
 .drop.held { transform: translateY(4px); box-shadow: 0 2px 0 #6e1322; }
-.kbd { display: none; font: 800 10px var(--body); opacity: .75; }
+.kbd { display: none; font: 800 12px var(--body); opacity: .75; }
 @media (hover: hover) and (pointer: fine) { .kbd { display: block; } }
-.foot { display: flex; align-items: center; gap: 6px; min-height: 36px; }
-.shelf { flex: 1; min-width: 0; display: flex; align-items: center; gap: 4px; overflow: hidden; font-size: 12px; color: var(--muted); white-space: nowrap; }
-.chip { flex: none; width: 16px; height: 16px; border-radius: 50%; background: var(--c); box-shadow: inset 0 -2px 0 rgb(0 0 0 / .25), 0 0 0 1.5px #0b0d14; }
-.chip.cap { background: linear-gradient(var(--c) 50%, var(--cream) 50%); }
-.chip.box { border-radius: 4px; }
+.foot { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; min-height: 36px; }
+.shelf { flex: 1 0 100%; order: -1; min-width: 0; display: flex; align-items: center; gap: 3px; padding-top: 6px; font-size: 12px; color: var(--muted); white-space: nowrap; }
+.chip { position: relative; flex: 1 1 0; min-width: 0; max-width: 40px; height: 36px; padding: 0; border: 0; border-radius: 8px; background: none; cursor: pointer; display: grid; place-items: center; }
+.chip::before { content: ""; width: 18px; height: 18px; border-radius: 50%; background: var(--c); box-shadow: inset 0 -2px 0 rgb(0 0 0 / .25), 0 0 0 1.5px #0b0d14; }
+.chip.missing::before { --c: #1d2a33; box-shadow: none; outline: 1.5px dashed #3f6a70; outline-offset: -1.5px; }
+.chip.cap::before { background: linear-gradient(var(--c) 50%, var(--cream) 50%); }
+.chip.box::before { border-radius: 4px; }
+.chip.missing.cap::before { background: linear-gradient(var(--c) 50%, #26353f 50%); }
+.chip.thumb::before { display: none; }
+.chip img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; pointer-events: none; }
+.chip.missing img { filter: brightness(0) invert(.42); opacity: .45; }
+.chip i { position: absolute; right: -2px; top: -3px; font: 800 12px/1 var(--body); font-style: normal; color: var(--butter); text-shadow: 0 0 2px #06222a, 0 0 2px #06222a; }
+.chip b { position: absolute; left: 0; bottom: -2px; font: 800 12px/1 var(--body); color: var(--butter); text-shadow: 0 0 2px #06222a, 0 0 2px #06222a; }
+.shelf .count { margin-left: auto; padding-left: 4px; font-weight: 800; font-variant-numeric: tabular-nums; }
 .pill {
   flex: none;
-  min-height: 36px;
+  min-height: 44px;
   padding: 0 11px;
   border: 0;
   border-radius: 999px;
@@ -225,6 +243,10 @@ body {
   cursor: pointer;
 }
 .pill.warn { background: var(--pink); color: var(--cab-ink); box-shadow: none; }
+#info { min-width: 44px; }
+.guide { position: relative; }
+.guide::after { content: ""; position: absolute; inset: -5px; border-radius: inherit; box-shadow: 0 0 0 3px var(--butter); pointer-events: none; animation: guide 1.1s ease-in-out infinite alternate; }
+@keyframes guide { from { opacity: 1; } to { opacity: .25; } }
 button:focus-visible { outline: 3px solid var(--butter); outline-offset: 2px; }
 dialog {
   max-width: min(460px, calc(100% - 32px));
@@ -240,12 +262,28 @@ dialog {
 dialog::backdrop { background: rgb(3 12 15 / .7); }
 dialog h2 { margin: 0 0 8px; font: 400 17px var(--display); color: var(--butter); }
 dialog p { margin: 0 0 10px; color: #d6e7e8; }
+dialog h3 { margin: 14px 0 6px; font: 800 13px var(--body); letter-spacing: .08em; color: var(--muted); }
+.how { margin: 0 0 6px; padding: 0; list-style: none; }
+.how li { display: flex; align-items: center; gap: 10px; padding: 5px 0; font-weight: 800; }
+.how .ico { flex: none; width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; font: 400 10px var(--display); color: var(--cream); }
+.ico.k { background: radial-gradient(circle at 35% 30%, #ffb0cd, var(--pink) 55%, #c23f73); }
+.ico.d { background: radial-gradient(circle at 35% 30%, #ff9a9a, var(--red) 55%, #a81f33); }
+.ico.p { border-radius: 6px; background: var(--pink); color: var(--cab-ink); }
+.ico.s { background: var(--butter); color: var(--cab-ink); font: 800 14px var(--body); }
+.sr { position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 dialog .pill { margin-top: 4px; }
 #prize { text-align: center; padding-block: 20px; }
-#prize canvas { display: block; width: 168px; height: 168px; margin: 0 auto 6px; }
-#prize .eyebrow { margin: 0; font: 800 11px var(--body); letter-spacing: .16em; color: var(--muted); }
+#prize-view { display: block; width: 168px; height: 168px; margin: -12px auto 0; }
+#prize .eyebrow { margin: 0; font: 800 12px var(--body); letter-spacing: .16em; color: var(--muted); }
 #prize h2 { margin: 4px 0 6px; font-size: 22px; text-wrap: balance; }
 #prize .pill { min-width: 140px; }
+#prize.gold { box-shadow: 0 0 0 3px var(--butter), 0 0 36px rgb(255 213 107 / .45), 0 20px 50px rgb(0 0 0 / .6); }
+#prize.gold .eyebrow { color: var(--butter); }
+#prize-fx { position: fixed; inset: 0; width: 100%; height: 100%; z-index: -1; pointer-events: none; }
+.chip.shiny::before { box-shadow: 0 0 0 2px var(--butter), 0 0 8px var(--butter); }
+.chip.shiny img { filter: drop-shadow(0 0 1.5px var(--butter)) drop-shadow(0 0 4px var(--butter)); }
+.chip.bump { animation: pop .35s ease-out; }
+.fly { position: fixed; left: 0; top: 0; width: 56px; height: 56px; margin: -28px 0 0 -28px; pointer-events: none; z-index: 10; }
 .grain {
   position: fixed;
   inset: 0;
@@ -261,15 +299,33 @@ dialog .pill { margin-top: 4px; }
   .knob { left: 28px; top: 28px; width: 52px; height: 52px; }
   .drop { width: 74px; height: 74px; font-size: 14px; }
   .ledge { padding: 8px 12px; }
+  .chip { height: 30px; }
 }
-@media (prefers-reduced-motion: reduce) { .toast, .knob { transition: none; } }
+@media (orientation: landscape) and (max-height: 500px) {
+  .app { max-width: none; display: grid; grid-template-columns: minmax(0, 1fr) 300px; grid-template-rows: auto minmax(0, 1fr) auto; column-gap: 12px; }
+  .stage { grid-column: 1; grid-row: 1 / 4; min-height: 0; }
+  .hud { grid-column: 2; grid-row: 1; }
+  .ledge { grid-column: 2; grid-row: 2; align-self: center; }
+  .foot { grid-column: 2; grid-row: 3; flex-wrap: wrap; }
+}
+@media (max-width: 360px) {
+  .led { font-size: 12px; letter-spacing: 0; }
+  .meter { min-width: 52px; padding: 4px 6px; }
+  .meter span { letter-spacing: .04em; }
+  .stick { width: 96px; height: 96px; }
+  .stick .up, .stick .down { left: 26px; }
+  .stick .left, .stick .right { top: 26px; }
+  .knob { left: 25px; top: 25px; width: 46px; height: 46px; }
+  .drop { width: 64px; height: 64px; font-size: 13px; }
+}
+@media (prefers-reduced-motion: reduce) { .toast, .knob { transition: none; } .pop, .guide::after, .chip.bump { animation: none; } }
 </style>
 
 <div class="app">
   <header class="hud">
     <div class="meter"><span>TOKENS</span><b id="credits">10</b></div>
     <div class="led" id="led">INSERT COIN</div>
-    <div class="meter"><span>PRIZES WON</span><b id="wonCount">0</b></div>
+    <div class="meter"><span>WON</span><b id="wonCount">0</b></div>
     <button class="icon" id="mute" aria-label="Sound" aria-pressed="true">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9h4l5-4v14l-5-4H4z" fill="currentColor"/><path class="waves" d="M16.5 8.5a5 5 0 0 1 0 7M19 6a8.5 8.5 0 0 1 0 12"/><path class="mute-x" d="M17 9l5 6M22 9l-5 6"/></svg>
     </button>
@@ -277,13 +333,15 @@ dialog .pill { margin-top: 4px; }
 
   <main class="stage" id="stage">
     <canvas id="c" role="img" aria-label="Midnight Crane claw machine in 3D. Tap the prize door to collect a prize."></canvas>
-    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+    <canvas id="fx" aria-hidden="true"></canvas>
+    <div class="toast" id="toast" aria-hidden="true"></div>
+    <p id="sr" class="sr" aria-live="polite"></p>
   </main>
 
   <section class="ledge" aria-label="Machine controls">
     <div class="stick" id="stick">
-      <button class="up" data-dz="-1" aria-label="Move claw back">▲</button>
-      <button class="down" data-dz="1" aria-label="Move claw forward">▼</button>
+      <button class="up" data-dz="-1" aria-label="Move claw up">▲</button>
+      <button class="down" data-dz="1" aria-label="Move claw down">▼</button>
       <button class="left" data-dx="-1" aria-label="Move claw left">◀</button>
       <button class="right" data-dx="1" aria-label="Move claw right">▶</button>
       <span class="knob" id="knob"></span>
@@ -292,26 +350,35 @@ dialog .pill { margin-top: 4px; }
       <button class="coin" id="coin">Insert coin</button>
       <small id="hint">1 token per play</small>
     </div>
-    <button class="drop" id="drop" aria-label="Drop the claw">DROP<span class="kbd">Space</span></button>
+    <button class="drop" id="drop" aria-label="Drop the claw" aria-keyshortcuts="Space">DROP<span class="kbd" aria-hidden="true">Space</span></button>
   </section>
 
   <footer class="foot">
-    <div class="shelf" id="shelf"></div>
+    <div class="shelf" id="shelf" role="group"></div>
     <button class="pill" id="mode">Arcade grip</button>
     <button class="pill" id="reset">Start over</button>
-    <button class="pill" id="info" aria-label="How real claw machines are tuned">?</button>
+    <button class="pill" id="info" aria-label="How to play">?</button>
   </footer>
 </div>
 
-<dialog id="about">
-  <h2>How real claw machines are tuned</h2>
-  <p>The claw is a solenoid with two settings. It closes at a high grab voltage, then slides down to a lower retain voltage for the trip home. Betson's Fun Zone II ships at 35 V and 15 V, with a change time that fades from one to the other while the claw rises. That fade is why prizes so often slip near the top.</p>
-  <p>A payout setting gives the strong grip only every so many plays, so the machine keeps its margin. Game time is usually 20 seconds, and the claw stops dropping when its cable goes slack on a prize.</p>
-  <p><b>Arcade grip</b> copies that. The grip fades on most plays and stays strong on the payout play, every 3 to 6 tries. <b>Fair grip</b> holds whenever you center the claw over a prize, so only your aim counts. Prizes you nudge into the chute count too.</p>
+<dialog id="about" aria-labelledby="about-title">
+  <h2 id="about-title">How to play</h2>
+  <ul class="how">
+    <li><span class="ico k" aria-hidden="true"></span>Joystick or arrow keys move the claw</li>
+    <li><span class="ico d" aria-hidden="true"></span>DROP or Space drops it</li>
+    <li><span class="ico d" aria-hidden="true">2×</span>Tap DROP again to grab early</li>
+    <li><span class="ico p" aria-hidden="true"></span>Tap the door to take your prize</li>
+    <li><span class="ico s" aria-hidden="true">★</span>One prize sparkles each night. Win it for a star on your shelf</li>
+    <li><span class="ico s" aria-hidden="true">3×</span>Win 3 of the same prize and it turns shiny</li>
+  </ul>
+  <h3>Grip modes</h3>
+  <p><b>Arcade grip</b> fades as the claw rises, like a real machine. The better you center it, the more often it holds, and every few plays it stays strong all the way.</p>
+  <p><b>Fair grip</b> holds whenever you center the claw over a prize. Prizes you nudge into the chute count too.</p>
   <form method="dialog"><button class="pill">Close</button></form>
 </dialog>
 
 <dialog id="prize" aria-labelledby="prize-title">
+  <canvas id="prize-fx" aria-hidden="true"></canvas>
   <canvas id="prize-view" aria-hidden="true"></canvas>
   <p class="eyebrow">PRIZE COLLECTED</p>
   <h2 id="prize-title">Prize</h2>
@@ -341,10 +408,16 @@ const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
 const newPity = () => 3 + Math.floor(Math.random() * 4);
 const save = (() => {
   const s = { credits: 10, won: [], bin: [], mode: 'arcade', muted: false, since: 0, pity: newPity() };
-  try { Object.assign(s, JSON.parse(localStorage.getItem('crane-v2')) || {}); } catch {}
+  let raw;
+  try { raw = localStorage.getItem('crane-v2'); } catch {}
+  try { Object.assign(s, JSON.parse(raw) || {}); } catch {}
+  // a brand new player's first play gets the payout grip
+  if (raw == null) s.since = s.pity - 1;
   if (!Number.isFinite(s.credits) || s.credits < 0) s.credits = 10;
   if (!Array.isArray(s.won)) s.won = [];
   if (!Array.isArray(s.bin)) s.bin = [];
+  if (!Array.isArray(s.stars)) s.stars = [];
+  if (!Number.isInteger(s.tut)) s.tut = s.won.length || s.credits !== 10 ? 3 : 0;
   return s;
 })();
 const persist = () => { try { localStorage.setItem('crane-v2', JSON.stringify(save)); } catch {} };
@@ -371,6 +444,10 @@ const KINDS = [
   { name: 'Robo Cube', type: 'box', c: '#b8c7d9', a: '#ff6fa3' },
 ];
 const PILE = [0, 1, 2, 0, 1, 3, 4, 3, 2, 5, 6, 7, 5, 6, 7, 8, 9, 4];
+// a night runs 6 am to 6 am local, so a session past midnight keeps its star
+const tonight = (d => d.getFullYear() * 400 + d.getMonth() * 31 + d.getDate())(new Date(Date.now() - 6 * 3600e3));
+const STAR_KIND = tonight * 7 % KINDS.length;
+const SHINY = 3;
 
 // ---------- renderer ----------
 const canvas = $('c');
@@ -411,6 +488,8 @@ inkMat.onBeforeCompile = s => {
     'vec3 transformed = position + normal * (0.011 + sin(position.y * 40.0 + position.x * 23.0 + inkT) * 0.003);');
 };
 const inked = m => { m.add(new THREE.Mesh(m.geometry, inkMat)); return m; };
+const inkGold = new THREE.MeshBasicMaterial({ color: '#ffd56b', side: THREE.BackSide });
+inkGold.onBeforeCompile = inkMat.onBeforeCompile;
 
 const M4 = new THREE.Matrix4(), QT = new THREE.Quaternion(), EU = new THREE.Euler();
 function part(geo, color, p = [0, 0, 0], s = [1, 1, 1], r = [0, 0, 0]) {
@@ -582,6 +661,19 @@ glow.position.set(0, 2.64, -0.6);
 glow.scale.set(2.5, 0.95, 1);
 scene.add(glow);
 
+const sparkTex = canvasTex(128, 128, (g, w, h) => {
+  const r = g.createRadialGradient(w / 2, h / 2, 2, w / 2, h / 2, w / 2);
+  r.addColorStop(0, 'rgba(255,243,223,1)'); r.addColorStop(0.25, 'rgba(255,213,107,.55)'); r.addColorStop(1, 'rgba(255,213,107,0)');
+  g.fillStyle = r; g.fillRect(0, 0, w, h);
+  g.fillStyle = '#fff3df';
+  g.beginPath();
+  for (let i = 0; i < 8; i++) { const a = i * Math.PI / 4, k = i % 2 ? 9 : 62; g.lineTo(w / 2 + Math.cos(a) * k, h / 2 + Math.sin(a) * k); }
+  g.fill();
+});
+const spark = new THREE.Sprite(new THREE.SpriteMaterial({ map: sparkTex.tex, blending: THREE.AdditiveBlending, depthTest: false, depthWrite: false }));
+spark.renderOrder = 4;
+scene.add(spark);
+
 const BULBS = 26;
 const bulbs = new THREE.InstancedMesh(sph(0.02, 8, 6), new THREE.MeshBasicMaterial(), BULBS);
 for (let i = 0; i < BULBS; i++) {
@@ -682,16 +774,38 @@ const fingerGeo = mergeGeometries([
 ]);
 const fingerMeshes = PHIS.map(() => { const m = inked(new THREE.Mesh(fingerGeo, vcMat)); m.castShadow = true; return m; });
 scene.add(bridge, carriage, cable, hubMesh, ...fingerMeshes);
+// faint see-through copy so the claw stays readable behind the front-right post
+const ghostMat = new THREE.MeshBasicMaterial({ color: '#fff3df', transparent: true, opacity: 0.3, depthTest: false, depthWrite: false });
+const ghosts = [hubMesh, ...fingerMeshes, cable].map(src => {
+  const g = new THREE.Mesh(src.geometry, ghostMat);
+  g.renderOrder = 3;
+  g.visible = false;
+  scene.add(g);
+  return { g, src };
+});
 
 // aim helpers: target ring, shadow blob and a dotted plumb line
-const ring = new THREE.Mesh(new THREE.RingGeometry(0.06, 0.092, 32).rotateX(-Math.PI / 2), basic({ color: BT, opacity: 0.9 }));
+// drawn over the pile so plush in front cannot hide where the claw will land
+const ring = new THREE.Mesh(new THREE.RingGeometry(0.055, 0.1, 32).rotateX(-Math.PI / 2), basic({ color: BT, opacity: 0.95, depthTest: false }));
+const disc = new THREE.Mesh(new THREE.CircleGeometry(0.055, 24).rotateX(-Math.PI / 2), basic({ color: BT, opacity: 0.3, depthTest: false }));
+disc.material.color = ring.material.color;
+ring.add(disc);
 const blob = new THREE.Mesh(new THREE.CircleGeometry(0.075, 24).rotateX(-Math.PI / 2), basic({ color: '#000000', opacity: 0.45 }));
 const plumbGeo = new THREE.BufferGeometry().setFromPoints([new V3(), new V3(0, -1, 0)]);
 // set once; computeLineDistances() makes a new attribute each call and leaks its GL buffer
 plumbGeo.setAttribute('lineDistance', new THREE.Float32BufferAttribute([0, 1], 1));
-const plumb = new THREE.Line(plumbGeo, new THREE.LineDashedMaterial({ color: BT, dashSize: 0.025, gapSize: 0.025, transparent: true, opacity: 0.7 }));
-ring.renderOrder = blob.renderOrder = 2;
-scene.add(ring, blob, plumb);
+const plumb = new THREE.Line(plumbGeo, new THREE.LineDashedMaterial({ color: BT, dashSize: 0.025, gapSize: 0.025, transparent: true, opacity: 0.8, depthTest: false }));
+blob.renderOrder = 2;
+ring.renderOrder = disc.renderOrder = plumb.renderOrder = 3;
+// the targeted prize swaps to a pink outline
+const inkHot = new THREE.MeshBasicMaterial({ color: PK, side: THREE.BackSide });
+inkHot.onBeforeCompile = inkMat.onBeforeCompile;
+let hot = null;
+// drawn over the pile so a miss on the side of a prize still shows
+const bonkRing = new THREE.Mesh(ring.geometry, basic({ color: '#ef3b4f', depthTest: false }));
+bonkRing.renderOrder = 3;
+bonkRing.visible = false;
+scene.add(ring, blob, plumb, bonkRing);
 
 // ---------- physics ----------
 const world = new CANNON.World({ gravity: new CANNON.Vec3(0, -9.82, 0) });
@@ -792,7 +906,9 @@ function prizeGeo(k) {
 }
 
 const prizes = [];
+let pileGen = 0;
 let bin = [];
+let starPrize = null;
 function addPrize(kind, x, y, z) {
   const { type } = KINDS[kind];
   const body = new CANNON.Body({ mass: type === 'cap' ? 0.2 : 0.3, material: prizeMat, linearDamping: 0.1, angularDamping: type === 'cap' ? 0.7 : 0.3, sleepSpeedLimit: 0.15, sleepTimeLimit: 0.5 });
@@ -805,7 +921,7 @@ function addPrize(kind, x, y, z) {
   } else body.addShape(new CANNON.Box(new CANNON.Vec3(0.085, 0.085, 0.085)));
   body.position.set(x, y, z);
   // bias yaw so most faces turn toward the camera
-  body.quaternion.setFromEuler(rand(-0.4, 0.4), YAW + rand(-0.9, 0.9), rand(-0.4, 0.4));
+  body.quaternion.setFromEuler(rand(-0.4, 0.4), YAW + rand(-0.5, 0.5), rand(-0.4, 0.4));
   const mesh = inked(new THREE.Mesh(prizeGeo(kind), vcMat));
   mesh.castShadow = true;
   scene.add(mesh);
@@ -821,16 +937,21 @@ function removePrize(p) {
 }
 
 function buildPile() {
+  pileGen++;
   for (const p of [...prizes]) { removePrize(p); scene.remove(p.mesh); }
   bin = [];
   const spots = [];
   for (let layer = 0; layer < 2; layer++)
     for (let ix = 0; ix < 4; ix++) for (let iz = 0; iz < 4; iz++) {
       const x = -0.55 + ix * 0.37, z = -0.55 + iz * 0.37;
-      if (!(x < -0.2 && z > 0.2)) spots.push([x + rand(-0.04, 0.04), 1.15 + layer * 0.3, z + rand(-0.04, 0.04)]);
+      // keep clear of the chute lip, where the claw cannot reach the floor
+      if (!(x < -0.2 && z > 0.1)) spots.push([x + rand(-0.04, 0.04), 1.15 + layer * 0.3, z + rand(-0.04, 0.04)]);
     }
-  PILE.slice(save.bin.length).forEach((k, i) => addPrize(k, ...spots[i]));
+  const rest = [...PILE];
+  for (const k of save.bin) { const i = rest.indexOf(k); if (i >= 0) rest.splice(i, 1); }
+  rest.forEach((k, i) => addPrize(k, ...spots[i]));
   settle(260);
+  starPrize = save.starNight === tonight ? null : prizes.find(p => p.kind === STAR_KIND) || null;
   for (const k of save.bin) { const p = addPrize(k, -0.55, 0.45, 0.55); p.won = true; bin.push(p); }
   settle(60);
 }
@@ -848,11 +969,12 @@ function settle(n) {
 // ---------- claw state ----------
 const claw = { x: HOME.x, z: HOME.z, y: TOPY, theta: [REST, REST, REST], stall: [null, null, null] };
 const sway = { x: 0, z: 0, vx: 0, vz: 0, lvx: 0, lvz: 0 };
-const game = { state: 'idle', timer: 0, t: 0, dig: null, grabbed: false, slipped: false, wonThisPlay: false, lastSec: 0, slack: false };
+const game = { state: 'idle', timer: 0, t: 0, wait: 0, dig: null, grabbed: false, slipped: false, touched: false, wonThisPlay: false, payoutUsed: false, lastSec: 0, slack: false };
 let grip = null;
 let touchAny = false;
 const touchF = [null, null, null];
 const closeLog = [new Set(), new Set(), new Set()];
+const touched = new Set();
 
 const UP = new CANNON.Vec3(0, 1, 0), ZAX = new CANNON.Vec3(0, 0, 1);
 const qy = new CANNON.Quaternion(), qz = new CANNON.Quaternion(), qf = new CANNON.Quaternion(), qa = new CANNON.Quaternion(), qd = new CANNON.Quaternion();
@@ -885,7 +1007,9 @@ function placeClaw(teleport = false) {
   });
 }
 const reach = th => 0.035 + 0.2 * Math.cos(th) + 0.045;
-const minHubY = () => (inChute(claw.x - 0.12, claw.z + 0.12) ? 1.25 : FLOOR) + reach(Math.min(...claw.theta)) + 0.01;
+// open fingers reach about 0.12 left and 0.17 forward, so near the chute the guard stops them first
+const guarded = () => inChute(claw.x - 0.12, claw.z + 0.17);
+const minHubY = () => (guarded() ? 1.25 : FLOOR) + reach(Math.min(...claw.theta)) + 0.01;
 function fingersToward(target, rate, dt) {
   claw.theta = claw.theta.map(t => t + clamp(target - t, -rate * dt, rate * dt));
 }
@@ -894,10 +1018,13 @@ function fingersToward(target, rate, dt) {
 function insertCoin() {
   if (game.state !== 'idle' || save.credits <= 0) return false;
   save.credits--;
+  save.inPlay = true;
+  if (save.tut === 0) save.tut = 1;
   persist();
-  Object.assign(game, { state: 'aim', timer: AIM_TIME, grabbed: false, slipped: false, wonThisPlay: false, lastSec: AIM_TIME });
+  Object.assign(game, { state: 'aim', timer: AIM_TIME, grabbed: false, slipped: false, touched: false, wonThisPlay: false, payoutUsed: false, lastSec: AIM_TIME });
   sfx.coin(); buzz(15);
   setLED(`TIME ${AIM_TIME}`);
+  say(`Play started, ${AIM_TIME} seconds`);
   ui();
   return true;
 }
@@ -914,12 +1041,18 @@ function move(dx, dz) {
   if (game.state !== 'aim') return false;
   claw.x = clamp(claw.x + Math.sign(dx) * 0.06, -LIM, LIM);
   claw.z = clamp(claw.z + Math.sign(dz) * 0.06, -LIM, LIM);
+  if (dx || dz) tutMoved();
   return true;
 }
 function drop() {
   if (game.state === 'aim') {
     game.state = 'descend';
     game.dig = null;
+    game.wait = 0.15;
+    game.miss = null;
+    touched.clear();
+    claw.y += 0.01;
+    if (save.tut < 3) { save.tut = 3; persist(); }
     for (const p of prizes) if (Math.hypot(p.body.position.x - claw.x, p.body.position.z - claw.z) < 0.45) p.body.wakeUp();
     sfx.drop(); buzz(15); pressButton();
     setLED('GOOD LUCK');
@@ -946,7 +1079,7 @@ function decideGrip() {
     if (n < 2 || d > 0.12 || b.y > hp.y - 0.04 || p.won) continue;
     if (n > bestN || (n === bestN && d < bestD)) { best = p; bestN = n; bestD = d; }
   }
-  if (!best) return;
+  if (!best) return (game.miss = missTip(hp));
   game.grabbed = true;
   const q = 1 - bestD / 0.12;
   const b = best.body;
@@ -956,13 +1089,35 @@ function decideGrip() {
   let g;
   if (save.mode === 'fair') g = q > 0.4 ? { f0: 3, f1: 3, delay: 0, fade: 1, drift: 0.09 } : { f0: 3, f1: 1.12, delay: 0.3, fade: 1.2, drift: 0.05 };
   else if (payout && q > 0.25) g = { f0: 3, f1: 3, delay: 0, fade: 1, drift: 0.09 };
-  else g = { f0: 3, f1: Math.random() < 0.2 ? 1.08 : 0.8, delay: rand(0.6, 2.2), fade: 1.0, drift: 0.05 };
+  // fade ends within 1.8 s, before the lift reaches TOPY; a centered grab is likelier to keep a holding grip
+  // q 0.85 holds ~60%, q 1 ~93%, sloppy aims stay near the 8% floor
+  else g = { f0: 3, f1: Math.random() < 0.08 + 0.85 * q ** 3 ? 1.08 : 0.8, delay: rand(0.3, 1.0), fade: 0.8, drift: 0.05 };
   b.wakeUp();
   b.allowSleep = false;
   b.collisionFilterGroup = HELD_GROUP;
   const c = new CANNON.LockConstraint(hubBody, b, { maxForce: g.f0 * mg });
   world.addConstraint(c);
   grip = { ...g, c, p: best, mg, t: 0, off: b.position.vsub(hp) };
+  freezeUntil = performance.now() + 80;
+  if (!reduced) tweens.push({ t: 0, dur: 0.2, run: k => { cam.zoom = k < 1 ? 1.04 - 0.04 * k : 1; cam.updateProjectionMatrix(); } });
+  setLED('GOT ONE!');
+  say('Got one');
+}
+// tell the player which way the claw was off, measured at first touch, before the fingers shove the prize
+function missTip(hp) {
+  let near = null, nd = 1;
+  for (const p of touched) {
+    const d = Math.hypot(...p.aim);
+    if (!p.won && d < nd) { near = p; nd = d; }
+  }
+  if (!near) return null;
+  const [dx, dz] = near.aim, b = near.body.position, name = KINDS[near.kind].name;
+  bonkUntil = performance.now() + 600;
+  bonkRing.position.set(near.hit.x, near.hit.y + 0.01, near.hit.z);
+  if (nd < 0.05) return Math.hypot(b.x - hp.x, b.z - hp.z) > 0.08 ? `Dead center, but ${name} squirted out` : `Landed on top of ${name}. Try one lying flat`;
+  // screen words that match the stick: ▲ moves the claw to -z, away from the camera
+  const dir = [Math.abs(dx) > nd * 0.4 ? (dx > 0 ? 'right' : 'left') : '', Math.abs(dz) > nd * 0.4 ? (dz > 0 ? 'down' : 'up') : ''].filter(Boolean).join(' and ');
+  return `Just missed ${name}. Aim a little ${dir}`;
 }
 function gripStep(dt) {
   if (!grip) return;
@@ -972,11 +1127,15 @@ function gripStep(dt) {
   for (const eq of grip.c.equations) { eq.maxForce = f; eq.minForce = -f; }
   const drift = grip.p.body.position.vsub(hubBody.position).vsub(grip.off).length();
   if (drift > grip.drift) {
+    const kind = grip.p.kind;
     releaseGrip();
     game.slipped = true;
     game.slack = true;
     sfx.slip(); buzz(30);
-    toast('Slipped!');
+    const name = KINDS[kind].name;
+    toast(pickLine(['Butter fingers!', `${name} waved goodbye`, `${name} wriggled free`]));
+    setLED('NOOO!');
+    if (!reduced) slowUntil = performance.now() + 500;
   }
 }
 function releaseGrip() {
@@ -988,42 +1147,78 @@ function releaseGrip() {
   b.wakeUp();
   grip = null;
 }
+let lastLine = '', whiffs = 0, ledHoldUntil = 0;
+function pickLine(pool) {
+  const options = pool.length > 1 ? pool.filter(l => l !== lastLine) : pool;
+  return (lastLine = options[Math.floor(Math.random() * options.length)]);
+}
 function finishPlay() {
   game.state = 'idle';
   game.slack = false;
+  // a payout grip that still lost keeps the payout due for the next play
+  if (!game.payoutUsed) save.since++;
+  let word = bin.length ? 'TAKE PRIZE' : 'INSERT COIN';
   if (!game.wonThisPlay) {
-    save.since++;
-    if (!game.slipped) toast(game.grabbed ? 'So close!' : 'Missed. Center the ring on a prize.');
+    if (!game.touched && !game.grabbed) {
+      const line = pickLine(['Whiff! The claw grabbed fresh air', 'Nothing but air that time', 'The claw waved at the floor']);
+      toast(line + (whiffs++ < 2 ? '. Center the ring on a prize.' : ''));
+      word = 'WHIFF!';
+    } else if (!game.grabbed) {
+      toast('BONK!', game.miss || 'Aim at the middle');
+      word = 'BONK!';
+    } else {
+      if (!game.slipped) toast(pickLine(['So close!', 'So close! It almost made the chute']));
+      word = 'SO CLOSE';
+    }
     if (!game.grabbed) sfx.miss();
   }
+  save.inPlay = false;
   game.payoutUsed = false;
   persist();
   if (save.credits <= 0 && !bin.length) setTimeout(() => game.state === 'idle' && toast('Out of tokens. Tap for 5 free.'), 1600);
-  setLED(bin.length ? 'TAKE PRIZE' : 'INSERT COIN');
+  if (bin.length) word = 'TAKE PRIZE';
+  else if (game.wonThisPlay) word = 'INSERT COIN';
+  else ledHoldUntil = performance.now() + 1800;
+  setLED(word);
   ui();
 }
 function win(p) {
   p.won = true;
   bin.push(p);
+  if (p === starPrize) { p.star = true; starPrize = null; save.stars.push(p.kind); save.starNight = tonight; }
   save.bin = bin.map(q => q.kind);
   // only a payout grab restarts the cycle, so chute nudges can't keep postponing it
   if (game.payoutUsed) { save.since = 0; save.pity = newPity(); }
   persist();
-  game.wonThisPlay = true;
-  slowUntil = performance.now() + 700;
-  winUntil = performance.now() + 3500;
+  // a late slip from the previous play can land during idle or aim
+  if (game.state !== 'idle' && game.state !== 'aim') game.wonThisPlay = true;
+  const now = performance.now();
+  slowUntil = now + 700;
+  winUntil = now + 3500;
   setLED('WINNER!');
   sfx.win(); buzz([30, 60, 30, 60, 80]);
-  toast(`You won ${KINDS[p.kind].name}! Take your prize.`);
+  const fresh = !save.won.includes(p.kind) && bin.filter(q => q.kind === p.kind).length === 1;
+  toast(p.star ? "TONIGHT'S STAR!" : (fresh ? 'NEW! ' : '') + KINDS[p.kind].name.toUpperCase() + (fresh ? '' : '!'), p.star ? `${KINDS[p.kind].name}, tap the door` : 'Tap the door to take it');
+  say(`You won ${KINDS[p.kind].name}. Tap the door to take it`);
+  if (!reduced) {
+    shakeUntil = now + 300;
+    confetti(fxStage, ...toScreen(-0.55, 1.0, 0.55, fx));
+    tweens.push({ t: 0, dur: 0.6, run: k => { doorOpen = Math.abs(Math.sin(k * Math.PI * 3)) * (1 - k) * 0.4; } });
+    tweens.push({ t: 0, dur: 0.35, run: k => { cam.zoom = 1.05 - 0.05 * k; cam.updateProjectionMatrix(); } });
+  }
   ui();
 }
 const tweens = [];
 let doorOpen = 0;
 function takePrize() {
-  if (!bin.length) return false;
-  const kinds = bin.map(p => p.kind);
+  if (!bin.length || game.state !== 'idle') return false;
+  const gen = pileGen, extra = bin.length - 1, rank = { dup: 0, shiny: 1, new: 2, star: 3 };
+  let best = null;
   for (const p of bin) {
     removePrize(p);
+    const n = save.won.filter(k => k === p.kind).length + 1;
+    const tier = p.star ? 'star' : n === 1 ? 'new' : n === SHINY ? 'shiny' : 'dup';
+    if (!best || rank[tier] >= rank[best.tier]) best = { k: p.kind, tier, n };
     save.won.push(p.kind);
     const from = p.mesh.position.clone();
     tweens.push({ t: 0, dur: 0.8, run: k => {
@@ -1032,25 +1227,53 @@ function takePrize() {
       p.mesh.scale.setScalar(1 + k * 0.6 - (k > 0.7 ? (k - 0.7) * 5.3 : 0));
     }, done: () => scene.remove(p.mesh) });
     setTimeout(() => {
-      const n = addPrize(p.kind, rand(-0.3, 0.5), 2.0, rand(-0.5, 0.1));
+      if (gen !== pileGen) return;
+      // respawn a kind the player still lacks, so the pile keeps offering new goals
+      const owned = new Set(save.won);
+      const want = KINDS.findIndex((_, i) => !owned.has(i) && !prizes.some(q => q.kind === i));
+      const n = addPrize(want >= 0 ? want : p.kind, rand(-0.3, 0.5), 2.0, rand(-0.5, 0.1));
       n.body.wakeUp();
     }, 900);
   }
   tweens.push({ t: 0, dur: 1.1, run: k => { doorOpen = Math.sin(k * Math.PI); } });
   bin = [];
   save.bin = [];
+  const fullSet = !save.fullSet && new Set(save.won).size === KINDS.length;
+  if (fullSet) save.fullSet = true;
   persist();
   sfx.take(); buzz(20);
-  setTimeout(() => showPrize(kinds), 500);
+  const wc = $('wonCount');
+  wc.classList.remove('pop'); void wc.offsetWidth; wc.classList.add('pop');
+  const door = doorPoint();
+  setTimeout(() => {
+    if (gen !== pileGen) return;
+    if (best.tier !== 'dup') return showPrize(best.k, extra, fullSet, best.tier);
+    // repeats skip the modal: a quick toast with progress toward shiny, and the prize flies to the shelf
+    const name = KINDS[best.k].name, left = KINDS.length - new Set(save.won).size;
+    toast(`${name} ×${best.n}` + (extra ? ` +${extra}` : ''), best.n < SHINY ? `${SHINY - best.n} more for a shiny ${name}` : left ? `Already shiny. ${left} still to find` : 'Already shiny. Full set found');
+    flyToShelf(best.k, door);
+  }, 500);
   if (game.state === 'idle') setLED('INSERT COIN');
   ui();
   return true;
 }
 let prizeView;
-function showPrize(kinds) {
-  const k = kinds[kinds.length - 1];
-  $('prize-title').textContent = KINDS[k].name + (kinds.length > 1 ? ` +${kinds.length - 1} more` : '');
-  $('prize-meta').textContent = `${save.won.length} on your shelf`;
+let fullSetPending = false, flyPending = null;
+function doorPoint() {
+  const r = canvas.getBoundingClientRect(), v = new V3(-0.52, 0.4, 0.83).project(cam);
+  return { x: r.left + (v.x + 1) / 2 * r.width, y: r.top + (1 - v.y) / 2 * r.height };
+}
+function flyToShelf(k, from) {
+  const chip = chips[k], to = chip.getBoundingClientRect(), bump = () => { chip.classList.remove('bump'); void chip.offsetWidth; chip.classList.add('bump'); };
+  if (reduced || !thumbs[k]) return bump();
+  const img = new Image();
+  img.src = thumbs[k]; img.alt = ''; img.className = 'fly';
+  document.body.append(img);
+  const end = `translate(${to.left + to.width / 2}px, ${to.top + to.height / 2}px) scale(.5)`;
+  img.animate([{ transform: `translate(${from.x}px, ${from.y}px) scale(1.3)` }, { transform: `translate(${(from.x + to.left) / 2}px, ${Math.min(from.y, to.top) - 60}px) scale(1)`, offset: 0.45 }, { transform: end }], { duration: 650, easing: 'ease-in-out' })
+    .finished.then(() => { img.remove(); bump(); }, () => img.remove());
+}
+function prizeRenderer() {
   if (!prizeView) {
     const r = new THREE.WebGLRenderer({ canvas: $('prize-view'), antialias: true, alpha: true });
     r.setPixelRatio(Math.min(devicePixelRatio || 1, 2));
@@ -1061,30 +1284,76 @@ function showPrize(kinds) {
     d.position.set(1, 2, 2);
     s.add(d);
     const cam = new THREE.PerspectiveCamera(30, 1, 0.1, 10);
-    cam.position.set(0, 0.12, 1.2);
+    cam.position.set(0, 0.1, 0.9);
     cam.lookAt(0, 0.06, 0);
     prizeView = { r, s, cam, mesh: null };
   }
-  const v = prizeView;
+  return prizeView;
+}
+const thumbs = [];
+function makeThumbs() {
+  try {
+    const v = prizeRenderer(), cam = new THREE.PerspectiveCamera(30, 1, 0.1, 10);
+    cam.position.set(0, 0.1, 0.85);
+    cam.lookAt(0, 0.06, 0);
+    v.r.setSize(72, 72, false);
+    KINDS.forEach((_, i) => {
+      const m = inked(new THREE.Mesh(prizeGeo(i), vcMat));
+      m.rotation.y = -0.4;
+      v.s.add(m);
+      v.r.render(v.s, cam);
+      v.s.remove(m);
+      thumbs[i] = v.r.domElement.toDataURL();
+    });
+    v.r.setSize(168, 168, false);
+    chips.forEach((c, i) => { const img = new Image(); img.alt = ''; img.src = thumbs[i]; c.prepend(img); c.classList.add('thumb'); });
+  } catch {}
+}
+function showPrize(k, extra, fullSet, how) {
+  const view = how === 'view', dlg = $('prize');
+  const found = new Set(save.won).size, n = save.won.filter(w => w === k).length, shiny = n >= SHINY, name = KINDS[k].name;
+  $('prize-title').textContent = name + (extra ? ` +${extra} more` : '');
+  dlg.querySelector('.eyebrow').textContent = view ? (shiny ? 'SHINY, ON YOUR SHELF' : 'ON YOUR SHELF') : { star: "★ TONIGHT'S STAR ★", new: 'NEW!', shiny: 'SHINY!' }[how];
+  $('prize-meta').textContent = how === 'shiny' ? `${SHINY} of a kind. It glows on your shelf now` : view ? (shiny ? `You have ${n}` : `You have ${n}. ${SHINY - n} more for shiny`) : n === 1 ? `${found} of ${KINDS.length} found` : `You have ${n}`;
+  if (how === 'star') $('prize-meta').textContent += '. A star for your shelf';
+  dlg.querySelector('form .pill').textContent = view ? 'Close' : 'Play again';
+  dlg.classList.toggle('gold', how === 'star' || shiny);
+  fullSetPending = fullSet;
+  flyPending = view ? null : k;
+  const v = prizeRenderer();
   if (v.mesh) v.s.remove(v.mesh);
   v.mesh = inked(new THREE.Mesh(prizeGeo(k), vcMat));
-  v.mesh.rotation.y = Math.PI - 0.6;
+  if (shiny) v.mesh.children[0].material = inkGold;
+  // frame each prize to its own size so small capsules do not float in empty space
+  const bs = v.mesh.geometry.boundingSphere || (v.mesh.geometry.computeBoundingSphere(), v.mesh.geometry.boundingSphere);
+  v.cam.position.set(0, bs.center.y + 0.04, bs.radius * 1.2 / Math.tan(15 * Math.PI / 180));
+  v.cam.lookAt(0, bs.center.y, 0);
+  // prize faces point at +z, toward this camera
+  v.mesh.rotation.y = -0.4;
   v.s.add(v.mesh);
-  $('prize').showModal();
-  const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
-  const spin = () => {
+  dlg.showModal();
+  if (!reduced && !view) {
+    const r = $('prize-view').getBoundingClientRect(), big = how === 'star';
+    fxModal.cv.width = innerWidth * pixelRatio; fxModal.cv.height = innerHeight * pixelRatio;
+    confetti(fxModal, (r.left + r.width / 2) * pixelRatio, (r.top + r.height / 2) * pixelRatio, big ? 140 : 70, big ? [BT, '#fff3df', '#ffb84d'] : undefined, big ? 1.4 : 1);
+  }
+  const still = matchMedia('(prefers-reduced-motion: reduce)').matches, t0 = performance.now();
+  const spin = now => {
     if (!$('prize').open) return;
+    if (!still) {
+      const t = (now - t0) / 1000, b = Math.min(1, t / 0.4);
+      v.mesh.rotation.y = -0.4 + Math.sin(t * 1.5) * 0.5;
+      v.mesh.scale.setScalar(b < 0.6 ? b / 0.6 * 1.15 : 1.15 - (b - 0.6) / 0.4 * 0.15);
+    }
     v.r.render(v.s, v.cam);
-    if (still) return;
-    v.mesh.rotation.y += 0.012;
-    requestAnimationFrame(spin);
+    if (!still) requestAnimationFrame(spin);
   };
-  spin();
+  spin(t0);
 }
 let resetArmed = 0;
 function startOver() {
   releaseGrip();
-  Object.assign(save, { credits: 10, won: [], bin: [], since: 0, pity: newPity() });
+  Object.assign(save, { credits: 10, won: [], bin: [], since: 0, pity: newPity(), inPlay: false, fullSet: false, stars: [], starNight: 0 });
   persist();
   Object.assign(claw, { x: HOME.x, z: HOME.z, y: TOPY, theta: [REST, REST, REST] });
   Object.assign(sway, { x: 0, z: 0, vx: 0, vz: 0, lvx: 0, lvz: 0 });
@@ -1101,25 +1370,32 @@ function gameStep(dt) {
   const px = claw.x, pz = claw.z;
   switch (game.state) {
     case 'aim': {
-      const d = inputDir();
-      claw.x = clamp(claw.x + d.x * MOVE * dt, -LIM, LIM);
-      claw.z = clamp(claw.z + d.z * MOVE * dt, -LIM, LIM);
+      const d = inputDir(), m = Math.hypot(d.x, d.z) || 1;
+      claw.x = clamp(claw.x + d.x / m * MOVE * dt, -LIM, LIM);
+      claw.z = clamp(claw.z + d.z / m * MOVE * dt, -LIM, LIM);
+      if (claw.x !== px || claw.z !== pz) tutMoved();
       fingersToward(REST, 1, dt);
-      game.timer -= dt;
       const sec = Math.max(0, Math.ceil(game.timer));
       if (sec !== game.lastSec) {
         game.lastSec = sec;
         setLED(`TIME ${sec}`);
         if (sec <= 5 && sec > 0) sfx.beep();
+        if (sec === 5) say('5 seconds left');
       }
       if (game.timer <= 0) drop();
       break;
     }
     case 'descend': {
       fingersToward(OPEN, 1.4, dt);
+      if (touchAny) game.touched = true;
+      if (game.wait > 0) { game.wait -= dt; break; }
       const speed = game.dig === null ? DROP_V : DROP_V * 0.35;
       claw.y -= speed * dt;
-      if (touchAny && game.dig === null && claw.y < TOPY - 0.1) game.dig = 0.2;
+      if (touchAny && game.dig === null && claw.y < TOPY - 0.1) {
+        // dig on past first contact so the fingers wrap tilted prizes instead of closing on top
+        game.dig = 0.35;
+        sfx.thump(); buzz(10);
+      }
       if (game.dig !== null) game.dig -= dt;
       const lo = minHubY();
       if (claw.y <= lo) { claw.y = lo; startClose(); }
@@ -1127,6 +1403,7 @@ function gameStep(dt) {
       break;
     }
     case 'close': {
+      if (touchAny) game.touched = true;
       for (let i = 0; i < 3; i++) {
         if (touchF[i]) closeLog[i].add(touchF[i]);
         if (claw.stall[i] === null && touchF[i]) claw.stall[i] = claw.theta[i] - 0.02;
@@ -1149,7 +1426,8 @@ function gameStep(dt) {
       }
       if (game.state === 'lift') {
         claw.y = Math.min(TOPY, claw.y + LIFT_V * dt);
-        if (claw.y >= TOPY) game.state = 'carry';
+        if (grip && grip.t > 0.6) setLED('HOLD ON');
+        if (claw.y >= TOPY && (game.t += dt) >= 0.2) game.state = 'carry';
       } else if (game.state === 'carry') {
         const dx = HOME.x - claw.x, dz = HOME.z - claw.z, d = Math.hypot(dx, dz), s = MOVE * 1.1 * dt;
         if (d <= s) { claw.x = HOME.x; claw.z = HOME.z; game.state = 'lower'; game.t = 0; }
@@ -1191,11 +1469,22 @@ function afterStep(dt) {
     if (i === undefined || !other.prize) continue;
     touchAny = true;
     if (i < 3) touchF[i] = other.prize;
+    const cb = other === c.bj ? c.bi : c.bj;
+    other.prize.hit = cb.position.vadd(other === c.bj ? c.ri : c.rj);
+    if (!touched.has(other.prize)) {
+      touched.add(other.prize);
+      other.prize.aim = [other.position.x - hubBody.position.x, other.position.z - hubBody.position.z];
+    }
   }
   for (const p of [...prizes]) {
     const b = p.body.position;
     if (p.ghost > 0 && (p.ghost -= dt) <= 0) p.body.collisionFilterGroup = 1;
     if (!p.won && b.y < 0.85 && inChute(b.x, b.z)) win(p);
+    // the floor slopes away from the chute lip, where the guard stops the claw short of the floor
+    if (!p.won && p !== grip?.p && b.y < 1.2 && b.x < -0.2 && b.z > 0.1 && !inChute(b.x, b.z) && game.state !== 'descend' && game.state !== 'close') {
+      const v = p.body.velocity;
+      if (v.x < 0.21 || v.z > -0.21) { p.body.wakeUp(); v.x = Math.max(v.x, 0.21); v.z = Math.min(v.z, -0.21); }
+    }
     // round capsules have no rolling resistance and never drop below cannon's sleep limit on their own
     const v = p.body.velocity, w = p.body.angularVelocity;
     if (p.body.allowSleep && p.body.sleepState !== CANNON.Body.SLEEPING && v.lengthSquared() < 4e-4 && w.lengthSquared() < 0.25) {
@@ -1210,6 +1499,8 @@ function afterStep(dt) {
 
 // ---------- input ----------
 const pad = { x: 0, z: 0 };
+// Chromium sends a detail-0 click after a touch tap, so clicks right after a pointerdown are that tap's echo
+let lastPtr = 0;
 const keys = new Set();
 const DIRS = { arrowleft: [-1, 0], a: [-1, 0], arrowright: [1, 0], d: [1, 0], arrowup: [0, -1], w: [0, -1], arrowdown: [0, 1], s: [0, 1] };
 function inputDir() {
@@ -1219,32 +1510,51 @@ function inputDir() {
   return { x: clamp(x, -1, 1), z: clamp(z, -1, 1) };
 }
 const stick = $('stick'), knob = $('knob');
-let stickPid = null;
+let stickPid = null, stickDown = null;
 function setPad(x, z) {
   if ((x || z) && (x !== pad.x || z !== pad.z)) buzz(8);
   pad.x = x; pad.z = z;
   knob.style.transform = `translate(${x * 22}px, ${z * 22}px)`;
-  stick.querySelectorAll('button').forEach(b => b.classList.toggle('on', +(b.dataset.dx || 0) === x && +(b.dataset.dz || 0) === z && (x || z)));
+  stick.querySelectorAll('button').forEach(b => b.classList.toggle('on', !!(+(b.dataset.dx || 0) === x && x || +(b.dataset.dz || 0) === z && z)));
 }
 function stickAt(e) {
   const r = stick.getBoundingClientRect();
   const dx = e.clientX - (r.left + r.width / 2), dy = e.clientY - (r.top + r.height / 2);
   if (Math.hypot(dx, dy) < 12) return setPad(0, 0);
-  if (Math.abs(dx) > Math.abs(dy)) setPad(Math.sign(dx), 0); else setPad(0, Math.sign(dy));
+  const a = Math.round(Math.atan2(dy, dx) / (Math.PI / 4)) * Math.PI / 4;
+  setPad(Math.round(Math.cos(a)), Math.round(Math.sin(a)));
 }
 stick.addEventListener('pointerdown', e => {
+  lastPtr = performance.now();
   e.preventDefault();
   stick.setPointerCapture(e.pointerId);
   stickPid = e.pointerId;
   stickAt(e);
+  stickDown = { t: performance.now(), x: claw.x, z: claw.z, dx: pad.x, dz: pad.z };
   if (game.state === 'idle') toast(bin.length ? 'Take your prize first' : save.credits > 0 ? 'Insert a coin to play' : 'Tap for 5 free tokens');
 });
 stick.addEventListener('pointermove', e => { if (e.pointerId === stickPid) stickAt(e); });
 for (const t of ['pointerup', 'pointercancel', 'lostpointercapture'])
-  stick.addEventListener(t, e => { if (e.pointerId === stickPid) { stickPid = null; setPad(0, 0); } });
+  stick.addEventListener(t, e => {
+    if (e.pointerId !== stickPid) return;
+    stickPid = null;
+    if (e.type === 'pointerup') tapNudge();
+    setPad(0, 0);
+  });
+// a quick tap moves the claw a fixed small step, since a 60 ms hold barely moves it
+function tapNudge() {
+  const d = stickDown;
+  if (game.state !== 'aim' || !d || performance.now() - d.t > 150 || !(d.dx || d.dz)) return;
+  const m = Math.hypot(d.dx, d.dz), ux = d.dx / m, uz = d.dz / m;
+  if ((claw.x - d.x) * ux + (claw.z - d.z) * uz >= 0.03) return;
+  claw.x = clamp(d.x + ux * 0.03, -LIM, LIM);
+  claw.z = clamp(d.z + uz * 0.03, -LIM, LIM);
+  tutMoved();
+  sfx.tick(); buzz(8);
+}
 stick.addEventListener('click', e => {
   const b = e.target.closest('button');
-  if (b && e.detail === 0) move(+(b.dataset.dx || 0), +(b.dataset.dz || 0));
+  if (b && performance.now() - lastPtr > 600) move(+(b.dataset.dx || 0), +(b.dataset.dz || 0));
 });
 stick.addEventListener('contextmenu', e => e.preventDefault());
 
@@ -1253,24 +1563,32 @@ function pressDrop() {
   if (!drop()) toast('The claw is already on its way');
 }
 const dropBtn = $('drop');
-dropBtn.addEventListener('pointerdown', e => { e.preventDefault(); dropBtn.classList.add('held'); pressDrop(); });
+dropBtn.addEventListener('pointerdown', e => { lastPtr = performance.now(); e.preventDefault(); dropBtn.classList.add('held'); pressDrop(); });
 for (const t of ['pointerup', 'pointercancel', 'pointerleave']) dropBtn.addEventListener(t, () => dropBtn.classList.remove('held'));
-dropBtn.addEventListener('click', e => { if (e.detail === 0) pressDrop(); });
+dropBtn.addEventListener('click', () => { if (performance.now() - lastPtr > 600) pressDrop(); });
 dropBtn.addEventListener('contextmenu', e => e.preventDefault());
 
 function coinAction() {
-  if (bin.length) return takePrize();
   if (game.state !== 'idle') return false;
+  if (bin.length) return takePrize();
   return save.credits > 0 ? insertCoin() : freeCredits();
 }
 $('coin').addEventListener('click', coinAction);
 $('mode').addEventListener('click', () => {
   save.mode = save.mode === 'fair' ? 'arcade' : 'fair';
   persist(); ui();
-  toast(save.mode === 'fair' ? 'Fair grip: aim decides' : 'Arcade grip: payout cycle');
+  toast(save.mode === 'fair' ? 'Fair grip: aim decides' : 'Arcade grip: center it to hold');
 });
 $('mute').addEventListener('click', () => { save.muted = !save.muted; persist(); setHum(0); ui(); });
 $('info').addEventListener('click', () => $('about').showModal());
+$('prize').addEventListener('close', () => {
+  fxModal.bits = [];
+  fxModal.cv.getContext('2d').clearRect(0, 0, fxModal.cv.width, fxModal.cv.height);
+  if (flyPending !== null) { const r = $('prize-view').getBoundingClientRect(); flyToShelf(flyPending, { x: r.left + r.width / 2, y: r.top + r.height / 2 }); flyPending = null; }
+  (prizeReturn || dropBtn).focus({ preventScroll: true });
+  prizeReturn = null;
+  if (fullSetPending) { fullSetPending = false; toast('Full set! Every prize found'); }
+});
 $('reset').addEventListener('click', () => {
   const b = $('reset');
   if (Date.now() < resetArmed) { resetArmed = 0; b.textContent = 'Start over'; b.classList.remove('warn'); return startOver(); }
@@ -1306,7 +1624,8 @@ canvas.addEventListener('pointerdown', e => {
 // ---------- sound and haptics ----------
 let ac = null, hum = null, humLevel = 0;
 function audio() {
-  if (save.muted) return null;
+  // automated playtests (Playwright sets webdriver) stay silent; headless WebKit plays audio out loud
+  if (save.muted || navigator.webdriver) return null;
   try {
     ac ??= new (window.AudioContext || window.webkitAudioContext)();
     if (ac.state === 'suspended') ac.resume();
@@ -1358,6 +1677,8 @@ const sfx = {
   slip() { tone(320, 0.4, 'sawtooth', 0, 0.05, 90); },
   miss() { tone(230, 0.3, 'triangle', 0.1, 0.05, 150); },
   beep() { tone(990, 0.07, 'square', 0, 0.035); },
+  tick() { tone(1800, 0.02, 'square', 0, 0.02); },
+  thump() { tone(110, 0.12, 'sine', 0, 0.08, 70); noise(0.05, 400, 0.08); },
   take() { tone(660, 0.08, 'sine'); tone(990, 0.14, 'sine', 0.08); },
   win() { [523, 659, 784, 1047, 1319].forEach((f, i) => tone(f, 0.14, 'square', i * 0.09, 0.045)); [1047, 1319, 1568].forEach(f => tone(f, 0.5, 'triangle', 0.5, 0.04)); },
 };
@@ -1365,9 +1686,15 @@ const buzz = p => { try { if (navigator.userActivation?.hasBeenActive !== false)
 
 // ---------- UI ----------
 let toastTimer;
-function toast(text) {
+const say = text => { $('sr').textContent = text; };
+function toast(text, sub) {
   const t = $('toast');
-  t.textContent = text;
+  if (sub) {
+    const a = document.createElement('span'), b = document.createElement('span');
+    a.className = 'big'; a.textContent = text; b.textContent = sub;
+    t.replaceChildren(a, b);
+  } else t.textContent = text;
+  say(sub ? `${text} ${sub}` : text);
   t.classList.add('on');
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => t.classList.remove('on'), 2200);
@@ -1377,8 +1704,19 @@ function setLED(text) {
   if (text === ledText && ledOn) return;
   ledText = text;
   ledOn = true;
-  $('led').textContent = text;
-  ledTex.redraw(text, true);
+  showLED(text, true);
+}
+function showLED(text, on) {
+  const el = $('led');
+  el.textContent = text;
+  el.classList.toggle('long', text.length > 11);
+  ledTex.redraw(text, on);
+}
+function tutMoved() {
+  if (save.tut !== 1) return;
+  save.tut = 2;
+  persist();
+  ui();
 }
 let pressT = 0;
 const pressButton = () => { pressT = 0.18; };
@@ -1387,33 +1725,63 @@ function ui() {
   $('wonCount').textContent = save.won.length;
   const coin = $('coin');
   const idle = game.state === 'idle';
-  coin.className = 'coin' + (bin.length ? ' take' : idle && save.credits <= 0 ? ' free' : '');
-  coin.disabled = !bin.length && !idle;
-  $('drop').setAttribute('aria-label', !idle ? 'Drop the claw' : bin.length ? 'Take prize' : save.credits > 0 ? 'Insert coin' : 'Get 5 free tokens');
-  coin.innerHTML = bin.length ? 'Take prize<span class="kbd">E</span>' : !idle ? 'Playing' : save.credits > 0 ? 'Insert coin<span class="kbd">C</span>' : '+5 free tokens';
+  const take = idle && bin.length > 0;
+  coin.className = 'coin' + (take ? ' take' : idle && save.credits <= 0 ? ' free' : '') + (idle && save.tut === 0 ? ' guide' : '');
+  coin.disabled = !idle;
+  $('drop').setAttribute('aria-label', !idle ? 'Drop the claw' : bin.length ? 'Drop (takes your prize)' : save.credits > 0 ? 'Drop (inserts a coin)' : 'Drop (gets 5 free tokens)');
+  coin.innerHTML = !idle ? 'Playing' : take ? 'Take prize<span class="kbd" aria-hidden="true">E</span>' : save.credits > 0 ? 'Insert coin<span class="kbd" aria-hidden="true">C</span>' : '+5 free tokens';
+  coin.setAttribute('aria-keyshortcuts', take ? 'E' : 'C');
+  stick.classList.toggle('guide', game.state === 'aim' && save.tut === 1);
+  $('drop').classList.toggle('guide', game.state === 'aim' && save.tut === 2);
   $('hint').textContent = bin.length ? 'or tap the door' : save.mode === 'fair' ? 'Aim decides' : '1 token per play';
   $('mode').textContent = save.mode === 'fair' ? 'Fair grip' : 'Arcade grip';
   $('mute').setAttribute('aria-pressed', String(!save.muted));
   $('mute').setAttribute('aria-label', save.muted ? 'Sound off' : 'Sound on');
   doorLabel.redraw(bin.length > 0);
-  const shelf = $('shelf');
-  shelf.replaceChildren();
-  if (!save.won.length) { shelf.textContent = 'Your prize shelf'; return; }
-  shelf.append(...save.won.slice(-12).reverse().map(k => {
-    const c = document.createElement('span');
-    c.className = 'chip ' + KINDS[k].type;
-    c.style.setProperty('--c', KINDS[k].c);
-    c.title = KINDS[k].name;
-    return c;
-  }));
+  const counts = KINDS.map((_, i) => save.won.filter(k => k === i).length);
+  const found = counts.filter(Boolean).length;
+  $('shelf').setAttribute('aria-label', `Prize shelf, ${found} of ${KINDS.length} found`);
+  shelfCount.textContent = `${found}/${KINDS.length}`;
+  chips.forEach((c, i) => {
+    const k = KINDS[i], n = counts[i], st = save.stars.includes(i);
+    c.classList.toggle('missing', !n);
+    c.classList.toggle('shiny', n >= SHINY);
+    c.style.setProperty('--c', k.c);
+    c.setAttribute('aria-label', n ? k.name + (n > 1 ? `, ${n}` : '') + (n >= SHINY ? ', shiny' : '') + (st ? ', star' : '') : 'Not found yet');
+    c.title = n ? k.name : 'Not found yet';
+    c.querySelectorAll('i, b').forEach(e => e.remove());
+    if (st) { const b = document.createElement('b'); b.textContent = '★'; c.append(b); }
+    if (n > 1) { const b = document.createElement('i'); b.textContent = `×${n}`; c.append(b); }
+  });
+}
+const shelfCount = document.createElement('span');
+shelfCount.className = 'count';
+shelfCount.setAttribute('aria-hidden', 'true');
+const chips = KINDS.map((k, i) => {
+  const c = document.createElement('button');
+  c.className = 'chip ' + k.type;
+  c.addEventListener('click', () => shelfTap(i, c));
+  return c;
+});
+$('shelf').append(...chips, shelfCount);
+let prizeReturn = null;
+function shelfTap(i, c) {
+  const n = save.won.filter(k => k === i).length, name = KINDS[i].name;
+  if (!n) return toast(name, 'Not found yet');
+  // the modal would hide the aim timer, so mid-play taps only name the prize
+  if (game.state !== 'idle') return toast(name, n >= SHINY ? `Shiny, you have ${n}` : n > 1 ? `You have ${n}` : 'On your shelf');
+  prizeReturn = c;
+  showPrize(i, 0, false, 'view');
 }
 
 // ---------- layout ----------
-const stage = $('stage');
+const stage = $('stage'), fx = $('fx'), fxg = fx.getContext('2d');
+const CABLE_W = 1.7;
 function fit() {
   const w = stage.clientWidth, h = stage.clientHeight;
   if (!w || !h) return;
   renderer.setSize(w, h, false);
+  fx.width = Math.round(w * pixelRatio); fx.height = Math.round(h * pixelRatio);
   cam.updateMatrixWorld();
   const box = new THREE.Box3().setFromObject(cabinet), b = new THREE.Box3(), v = new V3();
   for (const x of [box.min.x, box.max.x]) for (const y of [box.min.y, box.max.y]) for (const z of [box.min.z, box.max.z])
@@ -1432,7 +1800,30 @@ new ResizeObserver(fit).observe(stage);
 const ray = new THREE.Raycaster();
 ray.far = 2;
 const down = new V3(0, -1, 0), from = new V3(), up3 = new V3(0, 1, 0);
-let slowUntil = 0, winUntil = 0, last = performance.now(), acc = 0, lastRender = 0, needRender = true, chaseT = 0, slowFrames = 0;
+let bonkUntil = 0, slowUntil = 0, winUntil = 0, freezeUntil = 0, shakeUntil = 0, last = performance.now(), acc = 0, lastRender = 0, needRender = true, chaseT = 0, slowFrames = 0;
+const camBase = cam.position.clone();
+const fxStage = { cv: fx, g: fxg, bits: [], t: 0 }, fxModal = { cv: $('prize-fx'), g: $('prize-fx').getContext('2d'), bits: [], t: 0 };
+const toScreen = (x, y, z, cv) => { const v = new V3(x, y, z).project(cam); return [(v.x + 1) / 2 * cv.width, (1 - v.y) / 2 * cv.height]; };
+function confetti(L, x, y, n = 60, cols = [BT, PK, '#fff3df', '#2bb3b1'], power = 1) {
+  const s = pixelRatio * power;
+  L.bits = Array.from({ length: n }, (_, i) => ({ x, y, vx: rand(-260, 260) * s, vy: rand(-620, -260) * s, r: rand(0, 6), vr: rand(-12, 12), w: rand(5, 9) * pixelRatio, h: rand(3, 5) * pixelRatio, c: cols[i % cols.length] }));
+  L.t = 1.4 * Math.sqrt(power);
+}
+function stepConfetti(dt) {
+  for (const L of [fxStage, fxModal]) {
+    if (!L.bits.length) continue;
+    const g = L.g;
+    g.clearRect(0, 0, L.cv.width, L.cv.height);
+    if ((L.t -= dt) <= 0) { L.bits = []; continue; }
+    for (const b of L.bits) {
+      b.vy += 1300 * pixelRatio * dt; b.x += b.vx * dt; b.y += b.vy * dt; b.r += b.vr * dt;
+      g.save(); g.translate(b.x, b.y); g.rotate(b.r);
+      g.globalAlpha = Math.min(1, L.t / 0.3);
+      g.fillStyle = b.c; g.fillRect(-b.w / 2, -b.h / 2, b.w, b.h);
+      g.restore();
+    }
+  }
+}
 function syncVisuals(now, dt) {
   for (const p of prizes) { p.mesh.position.copy(p.body.position); p.mesh.quaternion.copy(p.body.quaternion); }
   hubMesh.position.copy(hubBody.position);
@@ -1442,8 +1833,13 @@ function syncVisuals(now, dt) {
   const top = new V3(claw.x, RAIL_Y - 0.06, claw.z), bot = hubMesh.position.clone().add(new V3(0, 0.07, 0));
   const dir = top.clone().sub(bot);
   cable.position.copy(bot).addScaledVector(dir, 0.5);
-  cable.scale.y = dir.length();
+  cable.scale.set(CABLE_W, dir.length(), CABLE_W);
   cable.quaternion.setFromUnitVectors(up3, dir.normalize());
+  const live = game.state !== 'idle';
+  for (const { g, src } of ghosts) {
+    g.visible = live;
+    if (live) { g.position.copy(src.position); g.quaternion.copy(src.quaternion); g.scale.copy(src.scale); }
+  }
 
   const d = inputDir();
   joyStick.rotation.set(d.z * 0.35, 0, -d.x * 0.35);
@@ -1453,12 +1849,15 @@ function syncVisuals(now, dt) {
 
   const aiming = game.state === 'aim' || game.state === 'descend';
   ring.visible = blob.visible = plumb.visible = false;
+  let target = null;
   if (aiming) {
     ray.set(from.set(hubBody.position.x, claw.y - 0.27, hubBody.position.z), down);
     const hit = ray.intersectObjects([floorMesh, ...prizes.filter(p => !p.won).map(p => p.mesh)], false)[0];
     if (hit) {
       ring.visible = blob.visible = plumb.visible = true;
       ring.position.copy(hit.point).y += 0.006;
+      ring.material.color.set(hit.object !== floorMesh && !guarded() ? PK : BT);
+      if (hit.object !== floorMesh && !guarded()) target = hit.object;
       blob.position.copy(hit.point).y += 0.004;
       const pulse = game.state === 'aim' && game.timer < 3 && !reduced ? 1 + Math.sin(now / 70) * 0.18 : 1;
       ring.scale.setScalar(pulse);
@@ -1471,6 +1870,18 @@ function syncVisuals(now, dt) {
     }
   }
 
+  if (target !== hot) {
+    if (hot) { hot.children[0].material = inkMat; hot.children[0].scale.setScalar(1); }
+    if ((hot = target)) { hot.children[0].material = inkHot; hot.children[0].scale.setScalar(1.08); }
+  }
+  bonkRing.visible = now < bonkUntil;
+  if (bonkRing.visible) bonkRing.scale.setScalar(reduced ? 1 : 1.6 - (bonkUntil - now) / 600);
+  spark.visible = !!starPrize;
+  if (starPrize) {
+    spark.position.copy(starPrize.body.position).y += KINDS[starPrize.kind].type === 'bear' || KINDS[starPrize.kind].type === 'cat' ? 0.3 : 0.17;
+    spark.scale.setScalar(reduced ? 0.22 : 0.21 + Math.sin(now / 260) * 0.04);
+    spark.material.rotation = reduced ? 0 : now / 1400;
+  }
   inkTime.value = reduced ? 0 : Math.floor(now / 125) * 1.7;
   const winning = now < winUntil;
   chaseT += dt;
@@ -1484,26 +1895,33 @@ function syncVisuals(now, dt) {
     bulbs.instanceColor.needsUpdate = true;
     glow.material.opacity = winning && !reduced ? 0.5 + Math.sin(now / 90) * 0.2 : 0.5;
   }
-  if (game.state === 'idle' && !bin.length && !winning) {
-    const text = save.credits > 0 ? 'INSERT COIN' : 'FREE PLAY';
-    const blink = reduced || Math.floor(now / 700) % 2 === 0;
-    if (text !== ledText || blink !== ledOn) { ledText = text; ledOn = blink; $('led').textContent = text; ledTex.redraw(text, blink); }
+  if (game.state === 'idle' && !bin.length && !winning && now >= ledHoldUntil) {
+    const phase = Math.floor(now / 700) % 2 === 0;
+    // only teases when the strong grip really is due
+    const tease = save.mode === 'arcade' && save.credits > 0 && save.since >= save.pity - 1;
+    const text = tease && !phase ? 'FEELING LUCKY?' : save.credits > 0 ? 'INSERT COIN' : 'FREE PLAY';
+    const blink = tease || reduced || phase;
+    if (text !== ledText || blink !== ledOn) { ledText = text; ledOn = blink; showLED(text, blink); }
   }
 }
 function frame(now) {
   requestAnimationFrame(frame);
-  const dtr = Math.min(0.1, (now - last) / 1000);
+  const raw = (now - last) / 1000, dtr = Math.min(0.1, raw);
   last = now;
-  acc += dtr * (now < slowUntil ? 0.4 : 1);
+  const frozen = now < freezeUntil;
+  // the aim countdown runs on wall time so a slow device still gets 20 real seconds
+  if (game.state === 'aim' && !frozen) game.timer -= Math.min(0.25, raw);
+  if (!frozen) acc += dtr * (now < slowUntil ? 0.4 : 1);
   let n = 0;
-  while (acc >= STEP && n < 4) {
+  while (acc >= STEP && n < 8) {
     gameStep(STEP);
     world.step(STEP);
     afterStep(STEP);
     acc -= STEP;
     n++;
   }
-  if (n === 4) acc = 0;
+  if (n === 8) acc = 0;
+  stepConfetti(dtr);
   for (let i = tweens.length - 1; i >= 0; i--) {
     const tw = tweens[i];
     tw.t += dtr;
@@ -1515,10 +1933,13 @@ function frame(now) {
   const motor = game.state === 'aim' ? (moving.x || moving.z ? 0.03 : 0) : ['descend', 'lift', 'carry', 'return'].includes(game.state) ? 0.022 : 0;
   setHum(motor);
 
-  const awake = prizes.some(p => p.body.sleepState !== CANNON.Body.SLEEPING);
+  const awake = prizes.some(p => p.body.sleepState !== CANNON.Body.SLEEPING && (p.body.velocity.lengthSquared() > 1e-4 || p.body.angularVelocity.lengthSquared() > 1e-2));
   if (!(needRender || awake || game.state !== 'idle' || tweens.length || now - lastRender > 120)) return;
   syncVisuals(now, dtr);
+  const shake = now < shakeUntil ? (shakeUntil - now) / 300 * 0.02 : 0;
+  if (shake) cam.position.copy(camBase).add(new V3(rand(-1, 1), rand(-1, 1), rand(-1, 1)).normalize().multiplyScalar(shake * Math.random()));
   renderer.render(scene, cam);
+  if (shake) cam.position.copy(camBase);
   lastRender = now;
   needRender = false;
 
@@ -1532,10 +1953,14 @@ function frame(now) {
 // ---------- boot ----------
 placeClaw(true);
 buildPile();
+const refunded = save.inPlay;
+if (refunded) { save.inPlay = false; save.credits++; persist(); toast('Play interrupted, token refunded'); }
 ui();
 fit();
+setTimeout(makeThumbs, 300);
 document.fonts?.load(`40px Bungee`).then(() => { marquee.redraw(); doorLabel.redraw(bin.length > 0); sideTex.redraw(); ledTex.redraw(ledText || 'INSERT COIN', true); needRender = true; }).catch(() => {});
 if (bin.length) setLED('TAKE PRIZE');
+else if (starPrize && save.tut === 3 && !refunded) setTimeout(() => game.state === 'idle' && toast("TONIGHT'S STAR", `${KINDS[STAR_KIND].name} sparkles in the pile`), 1200);
 requestAnimationFrame(frame);
 
 window.crane = {
@@ -1546,6 +1971,11 @@ window.crane = {
   get bin() { return bin.length; },
   get claw() { return { x: +claw.x.toFixed(3), z: +claw.z.toFixed(3) }; },
   get pile() { return prizes.filter(p => !p.won).map(p => ({ kind: KINDS[p.kind].name, x: +p.body.position.x.toFixed(3), y: +p.body.position.y.toFixed(3), z: +p.body.position.z.toFixed(3) })); },
+  get since() { return save.since; },
+  get pity() { return save.pity; },
+  get led() { return ledText; },
+  get star() { return starPrize && { kind: KINDS[starPrize.kind].name, x: +starPrize.body.position.x.toFixed(3), y: +starPrize.body.position.y.toFixed(3), z: +starPrize.body.position.z.toFixed(3) }; },
+  get stars() { return save.stars.length; },
   insertCoin, move, drop, takePrize, freeCredits,
 };
 </script>
