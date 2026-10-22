@@ -79,7 +79,10 @@ body {
 }
 .led.long { white-space: normal; line-height: 1.1; text-align: center; }
 .led { position: relative; }
-.led::after { content: ""; position: absolute; left: 8px; bottom: 4px; width: calc((100% - 16px) * var(--grip, 0)); height: 3px; border-radius: 2px; background: var(--pink); box-shadow: 0 0 6px var(--pink); transition: width .4s; }
+.led::after { content: ""; position: absolute; left: 8px; bottom: 4px; width: calc((100% - 16px) * var(--grip, 0)); height: 4px; border-radius: 2px; background: var(--pink); box-shadow: 0 0 6px var(--pink); transition: width .4s; }
+.led.arcade::before { content: ""; position: absolute; left: 8px; right: 8px; bottom: 4px; height: 4px; border-radius: 2px; background: rgb(255 111 163 / .22); }
+.led.pulse::after { animation: meter .45s ease-in-out 3; }
+@keyframes meter { 50% { transform: scaleY(1.8); box-shadow: 0 0 12px 2px var(--pink); } }
 .icon {
   flex: none;
   width: 44px;
@@ -279,6 +282,8 @@ dialog .pill { margin-top: 4px; }
 #prize .eyebrow { margin: 0; font: 800 12px var(--body); letter-spacing: .16em; color: var(--muted); }
 #prize h2 { margin: 4px 0 6px; font-size: 22px; text-wrap: balance; }
 #prize .pill { min-width: 140px; }
+.textbtn { display: block; min-height: 44px; margin: 4px auto 0; padding: 0 16px; border: 0; background: none; color: var(--muted); font: 800 13px var(--body); text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+.textbtn[hidden] { display: none; }
 #prize.gold { box-shadow: 0 0 0 3px var(--butter), 0 0 36px rgb(255 213 107 / .45), 0 20px 50px rgb(0 0 0 / .6); }
 #prize.gold .eyebrow { color: var(--butter); }
 #prize-fx { position: fixed; inset: 0; width: 100%; height: 100%; z-index: -1; pointer-events: none; }
@@ -309,6 +314,9 @@ dialog .pill { margin-top: 4px; }
   .hud { grid-column: 2; grid-row: 1; }
   .ledge { grid-column: 2; grid-row: 2; align-self: center; }
   .foot { grid-column: 2; grid-row: 3; flex-wrap: wrap; }
+  .led { font-size: 12px; letter-spacing: 0; }
+  .meter { min-width: 52px; padding: 4px 6px; }
+  .meter span { letter-spacing: .04em; }
 }
 @media (max-width: 360px) {
   .led { font-size: 12px; letter-spacing: 0; }
@@ -320,7 +328,7 @@ dialog .pill { margin-top: 4px; }
   .knob { left: 25px; top: 25px; width: 46px; height: 46px; }
   .drop { width: 64px; height: 64px; font-size: 13px; }
 }
-@media (prefers-reduced-motion: reduce) { .toast, .knob, .led::after { transition: none; } .pop, .guide::after, .chip.bump { animation: none; } }
+@media (prefers-reduced-motion: reduce) { .toast, .knob, .led::after { transition: none; } .pop, .guide::after, .chip.bump, .led.pulse::after { animation: none; } }
 </style>
 
 <div class="app">
@@ -385,7 +393,7 @@ dialog .pill { margin-top: 4px; }
   <p class="eyebrow">PRIZE COLLECTED</p>
   <h2 id="prize-title">Prize</h2>
   <p id="prize-meta"></p>
-  <form method="dialog"><button class="pill" value="play" autofocus>Play again</button></form>
+  <form method="dialog"><button class="pill" value="play" autofocus>Play again</button><button class="textbtn" value="close">Close</button></form>
 </dialog>
 
 <div class="grain" aria-hidden="true"></div>
@@ -1123,6 +1131,9 @@ function drop() {
 function startClose() {
   game.state = 'close';
   game.t = 0;
+  // where the claw closed, for naming the prize a miss was nearest
+  const hp = hubBody.position;
+  for (const p of prizes) p.closeOff = [p.body.position.x - hp.x, p.body.position.z - hp.z];
   claw.stall = [null, null, null];
   closeLog.forEach(s => s.clear());
   sfx.clack(); buzz([20, 40, 20]);
@@ -1140,7 +1151,9 @@ function decideGrip() {
   if (!best) return (game.miss = missTip(hp));
   game.grabbed = true;
   const q = 1 - bestD / 0.12;
-  game.grade = q > 0.75 ? 'PERFECT' : q > 0.4 ? 'GOOD' : 'EDGE';
+  // the grade is the same offset taken at first touch, since by now the fingers and the dig have shoved the prize to center
+  const aimQ = 1 - Math.hypot(...best.aim) / 0.12;
+  game.grade = aimQ > 0.75 ? 'PERFECT' : aimQ > 0.4 ? 'GOOD' : 'EDGE';
   const b = best.body;
   const mg = b.mass * 9.82 * STEP;
   const payout = save.since >= save.pity - 1;
@@ -1168,17 +1181,20 @@ function decideGrip() {
   setLED(game.grade === 'EDGE' ? 'EDGE GRAB' : game.grade + '!');
   toast(`${game.grade} GRAB`, { PERFECT: 'Dead center', GOOD: 'Close to center', EDGE: 'Only caught the edge' }[game.grade]);
 }
-// tell the player which way the claw was off, measured at first touch, before the fingers shove the prize
+// name the prize nearest where the claw closed, within the 0.15 the open finger tips reach
+// the way it was off is measured at first touch when it was touched, before the fingers shove it
 function missTip(hp) {
-  let near = null, nd = 1;
-  for (const p of touched) {
-    const d = Math.hypot(...p.aim);
+  let near = null, nd = 0.15;
+  for (const p of prizes) {
+    const d = p.closeOff ? Math.hypot(...p.closeOff) : 1;
     if (!p.won && d < nd) { near = p; nd = d; }
   }
   if (!near) return null;
-  const [dx, dz] = near.aim, b = near.body.position, name = KINDS[near.kind].name;
+  const hit = touched.has(near), [dx, dz] = hit ? near.aim : near.closeOff, b = near.body.position, name = KINDS[near.kind].name;
+  nd = Math.hypot(dx, dz);
   bonkUntil = performance.now() + 600;
-  bonkRing.position.set(near.hit.x, near.hit.y + 0.01, near.hit.z);
+  const at = hit ? near.hit : b;
+  bonkRing.position.set(at.x, at.y + 0.01, at.z);
   if (nd < 0.05) return Math.hypot(b.x - hp.x, b.z - hp.z) > 0.08 ? `Dead center, but ${name} squirted out` : `Landed on top of ${name}. Try one lying flat`;
   // screen words that match the stick: ▲ moves the claw to -z, away from the camera
   const wx = Math.abs(dx) > nd * 0.4 ? Math.sign(dx) : 0, wz = Math.abs(dz) > nd * 0.4 ? Math.sign(dz) : 0;
@@ -1201,7 +1217,10 @@ function gripStep(dt) {
     game.slack = true;
     sfx.slip(); buzz(30);
     const name = KINDS[kind].name;
-    toast(pickLine(['Butter fingers!', `${name} waved goodbye`, `${name} wriggled free`]), game.grade === 'EDGE' ? 'Edge grabs slip. Center the ring on it' : 'Your aim was good. The grip let go');
+    // arcade grip is weak until the payout play, so a good grab can still slip; say so and point at the meter
+    const weak = game.grade !== 'EDGE' && save.mode === 'arcade' && !game.payoutUsed;
+    toast(pickLine(['Butter fingers!', `${name} waved goodbye`, `${name} wriggled free`]), game.grade === 'EDGE' ? 'Edge grabs slip. Center the ring on it' : weak ? 'Good aim, weak grip this time. The pink bar fills to a strong grip' : 'Your aim was good. The grip let go');
+    if (weak) { const el = $('led'); el.classList.remove('pulse'); void el.offsetWidth; el.classList.add('pulse'); }
     setLED('NOOO!');
     if (!reduced) slowUntil = performance.now() + 500;
   }
@@ -1297,6 +1316,7 @@ function takePrize() {
     const n = save.won.filter(k => k === p.kind).length + 1;
     const tier = p.star ? 'star' : n === 1 ? 'new' : n === SHINY ? 'shiny' : 'dup';
     if (!best || rank[tier] >= rank[best.tier]) best = { k: p.kind, tier, n };
+    landing = best.k;
     save.won.push(p.kind);
     const from = p.mesh.position.clone();
     tweens.push({ t: 0, dur: 0.8, run: k => {
@@ -1337,13 +1357,15 @@ function takePrize() {
   return true;
 }
 let prizeView;
-let fullSetPending = false, flyPending = null;
+let fullSetPending = false, flyPending = null, landing = null;
 function doorPoint() {
   const r = canvas.getBoundingClientRect(), v = new V3(-0.52, 0.4, 0.83).project(cam);
   return { x: r.left + (v.x + 1) / 2 * r.width, y: r.top + (1 - v.y) / 2 * r.height };
 }
 function flyToShelf(k, from) {
   const chip = chips[k], to = chip.getBoundingClientRect(), bump = () => {
+    landing = null;
+    ui();
     chip.classList.remove('bump'); void chip.offsetWidth; chip.classList.add('bump');
     if (!reduced) chip.querySelector('i')?.animate([{ transform: 'scale(1)' }, { transform: 'scale(2.2)', color: '#fff3df', offset: 0.3 }, { transform: 'scale(1)' }], { duration: 700, easing: 'ease-out' });
   };
@@ -1353,7 +1375,7 @@ function flyToShelf(k, from) {
   document.body.append(img);
   const end = `translate(${to.left + to.width / 2}px, ${to.top + to.height / 2}px) scale(.5)`;
   img.animate([{ transform: `translate(${from.x}px, ${from.y}px) scale(1.3)` }, { transform: `translate(${(from.x + to.left) / 2}px, ${Math.min(from.y, to.top) - 60}px) scale(1)`, offset: 0.45 }, { transform: end }], { duration: 650, easing: 'ease-in-out' })
-    .finished.then(() => { img.remove(); bump(); }, () => img.remove());
+    .finished.then(() => { img.remove(); bump(); }, () => { img.remove(); bump(); });
 }
 function prizeRenderer() {
   if (!prizeView) {
@@ -1401,6 +1423,7 @@ function showPrize(k, extra, fullSet, how) {
   const btn = dlg.querySelector('form .pill');
   btn.textContent = view ? 'Close' : save.credits > 0 ? 'Play again' : 'Get 5 free tokens';
   btn.value = view ? '' : 'play';
+  dlg.querySelector('.textbtn').hidden = view;
   // Escape closes without touching returnValue, so clear the last one
   dlg.returnValue = '';
   dlg.classList.toggle('gold', how === 'star' || shiny);
@@ -1446,6 +1469,7 @@ function showPrize(k, extra, fullSet, how) {
 let resetArmed = 0, coinAt = 0;
 function startOver() {
   releaseGrip();
+  landing = null;
   Object.assign(save, { credits: 10, won: [], bin: [], since: 0, pity: newPity(), inPlay: false, fullSet: false, stars: [], starNight: 0 });
   persist();
   Object.assign(claw, { x: HOME.x, z: HOME.z, y: TOPY, theta: [REST, REST, REST] });
@@ -1684,6 +1708,11 @@ $('prize').addEventListener('close', () => {
   if ($('prize').returnValue === 'play' && !bin.length) { if (save.credits <= 0) freeCredits(); insertCoin(); }
   if (fullSetPending) { fullSetPending = false; toast('Full set! Every prize found'); }
 });
+// a tap outside the card closes it; clicks on the card's own padding also target the dialog, so check the box
+$('prize').addEventListener('click', e => {
+  const d = e.currentTarget, r = d.getBoundingClientRect();
+  if (e.target === d && (e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom)) d.close();
+});
 $('reset').addEventListener('click', () => {
   const b = $('reset');
   if (Date.now() < resetArmed) { resetArmed = 0; b.textContent = 'Start over'; b.classList.remove('warn'); return startOver(); }
@@ -1833,10 +1862,12 @@ function ui() {
   $('hint').textContent = bin.length ? 'or tap the door' : save.mode === 'fair' ? 'Aim decides' : '1 token per play';
   $('mode').textContent = save.mode === 'fair' ? 'Fair grip' : 'Arcade grip';
   $('led').style.setProperty('--grip', save.mode === 'arcade' ? Math.min(1, (save.since + 1) / save.pity) : 0);
+  $('led').classList.toggle('arcade', save.mode === 'arcade');
   $('mute').setAttribute('aria-pressed', String(!save.muted));
   $('mute').setAttribute('aria-label', save.muted ? 'Sound off' : 'Sound on');
   doorLabel.redraw(bin.length > 0);
-  const counts = KINDS.map((_, i) => save.won.filter(k => k === i).length);
+  // the prize flying to the shelf counts once it lands
+  const counts = KINDS.map((_, i) => save.won.filter(k => k === i).length - (i === landing));
   const found = counts.filter(Boolean).length;
   $('shelf').setAttribute('aria-label', `Prize shelf, ${found} of ${KINDS.length} found`);
   shelfCount.textContent = `${found}/${KINDS.length}`;
