@@ -78,6 +78,8 @@ body {
   overflow: hidden;
 }
 .led.long { white-space: normal; line-height: 1.1; text-align: center; }
+.led { position: relative; }
+.led::after { content: ""; position: absolute; left: 8px; bottom: 4px; width: calc((100% - 16px) * var(--grip, 0)); height: 3px; border-radius: 2px; background: var(--pink); box-shadow: 0 0 6px var(--pink); transition: width .4s; }
 .icon {
   flex: none;
   width: 44px;
@@ -100,7 +102,7 @@ body {
 .toast {
   position: absolute;
   left: 50%;
-  top: 6px;
+  top: var(--toast-top, 6px);
   width: max-content;
   max-width: calc(100% - 16px);
   box-sizing: border-box;
@@ -318,7 +320,7 @@ dialog .pill { margin-top: 4px; }
   .knob { left: 25px; top: 25px; width: 46px; height: 46px; }
   .drop { width: 64px; height: 64px; font-size: 13px; }
 }
-@media (prefers-reduced-motion: reduce) { .toast, .knob { transition: none; } .pop, .guide::after, .chip.bump { animation: none; } }
+@media (prefers-reduced-motion: reduce) { .toast, .knob, .led::after { transition: none; } .pop, .guide::after, .chip.bump { animation: none; } }
 </style>
 
 <div class="app">
@@ -368,11 +370,11 @@ dialog .pill { margin-top: 4px; }
     <li><span class="ico d" aria-hidden="true"></span>DROP or Space drops it</li>
     <li><span class="ico d" aria-hidden="true">2×</span>Tap DROP again to grab early</li>
     <li><span class="ico p" aria-hidden="true"></span>Tap the door to take your prize</li>
-    <li><span class="ico s" aria-hidden="true">★</span>One prize sparkles each night. Win it for a star on your shelf</li>
+    <li><span class="ico s" aria-hidden="true">★</span>One prize glows gold each night. Win it for a star on your shelf</li>
     <li><span class="ico s" aria-hidden="true">3×</span>Win 3 of the same prize and it turns shiny</li>
   </ul>
   <h3>Grip modes</h3>
-  <p><b>Arcade grip</b> fades as the claw rises, like a real machine. The better you center it, the more often it holds, and every few plays it stays strong all the way.</p>
+  <p><b>Arcade grip</b> fades as the claw rises, like a real machine. The better you center it, the more often it holds, and every few plays it stays strong all the way. The pink bar under the sign fills as that play gets closer.</p>
   <p><b>Fair grip</b> holds whenever you center the claw over a prize. Prizes you nudge into the chute count too.</p>
   <form method="dialog"><button class="pill">Close</button></form>
 </dialog>
@@ -383,7 +385,7 @@ dialog .pill { margin-top: 4px; }
   <p class="eyebrow">PRIZE COLLECTED</p>
   <h2 id="prize-title">Prize</h2>
   <p id="prize-meta"></p>
-  <form method="dialog"><button class="pill" autofocus>Play again</button></form>
+  <form method="dialog"><button class="pill" value="play" autofocus>Play again</button></form>
 </dialog>
 
 <div class="grain" aria-hidden="true"></div>
@@ -423,9 +425,31 @@ const save = (() => {
 const persist = () => { try { localStorage.setItem('crane-v2', JSON.stringify(save)); } catch {} };
 
 // ---------- world constants (1 unit ~ 50 cm) ----------
-const FLOOR = 1.0, IN = 0.76, TOPY = 2.12, RAIL_Y = 2.3, LIM = 0.55;
+const FLOOR = 1.0, IN = 0.76, TOPY = 2.12, RAIL_Y = 2.3;
+// open fingers reach 0.165 sideways, 0.11 back and 0.18 forward; this keeps them plus 0.04 of sway inside the glass
+const LIM = { x0: -0.56, x1: 0.59, z0: -0.62, z1: 0.57 };
+const clampX = x => clamp(x, LIM.x0, LIM.x1), clampZ = z => clamp(z, LIM.z0, LIM.z1);
 const CHUTE_X = -0.34, CHUTE_Z = 0.34;
 const inChute = (x, z) => x < CHUTE_X && z > CHUTE_Z;
+// sloped edges along the walls and the chute guard roll prizes back to where the claw can reach
+// [axis, rising direction, toe, top, range start, range end on the other axis]; toes sit just inside the claw limits
+const SLOPE_H = 0.13;
+const SLOPES = [['x', 1, 0.55, IN, -IN, IN], ['x', -1, -0.53, -IN, -IN, CHUTE_Z], ['z', -1, -0.58, -IN, -IN, IN], ['z', 1, 0.54, IN, CHUTE_X, IN], ['x', -1, -0.15, CHUTE_X, 0.15, IN], ['z', 1, 0.15, CHUTE_Z, -IN, CHUTE_X]];
+function floorAt(x, z) {
+  let h = 0;
+  for (const [ax, , toe, top, a, b] of SLOPES) {
+    const u = ax === 'x' ? x : z, v = ax === 'x' ? z : x;
+    if (v >= a && v <= b) h = Math.max(h, clamp((u - toe) / (top - toe), 0, 1));
+  }
+  return FLOOR + h * SLOPE_H;
+}
+function slopeFrame([ax, s, toe, top, a, b]) {
+  const ang = Math.atan2(SLOPE_H, Math.abs(top - toe));
+  const q = new THREE.Quaternion().setFromEuler(new THREE.Euler(ax === 'z' ? -s * ang : 0, 0, ax === 'x' ? s * ang : 0));
+  const mid = (toe + top) / 2, c = ax === 'x' ? new THREE.Vector3(mid, FLOOR + SLOPE_H / 2, (a + b) / 2) : new THREE.Vector3((a + b) / 2, FLOOR + SLOPE_H / 2, mid);
+  const along = Math.hypot(SLOPE_H, top - toe), len = b - a;
+  return { q, c, w: ax === 'x' ? along : len, d: ax === 'x' ? len : along };
+}
 const HOME = { x: -0.55, z: 0.55 };
 const AIM_TIME = 20, MOVE = 0.34, DROP_V = 0.55, LIFT_V = 0.42, STEP = 1 / 60;
 const OPEN = 0.52, SHUT = -0.08, REST = 0.1;
@@ -443,7 +467,9 @@ const KINDS = [
   { name: 'Toast Block', type: 'box', c: '#f2b35e', a: '#b8742f' },
   { name: 'Robo Cube', type: 'box', c: '#b8c7d9', a: '#ff6fa3' },
 ];
-const PILE = [0, 1, 2, 0, 1, 3, 4, 3, 2, 5, 6, 7, 5, 6, 7, 8, 9, 4];
+const PILE = [0, 1, 2, 0, 3, 4, 3, 2, 5, 6, 7, 5, 1, 8, 9, 4];
+// prizes read bigger on a phone; fewer of them keep the floor uncrowded, and plush still fits the chute lying flat
+const PS = 1.12;
 // a night runs 6 am to 6 am local, so a session past midnight keeps its star
 const tonight = (d => d.getFullYear() * 400 + d.getMonth() * 31 + d.getDate())(new Date(Date.now() - 6 * 3600e3));
 const STAR_KIND = tonight * 7 % KINDS.length;
@@ -590,6 +616,7 @@ const T = '#0f4c55', TD = '#0a3239', TI = '#072830', PK = '#ff6fa3', BT = '#ffd5
   const floorGeo = mergeGeometries([
     new THREE.PlaneGeometry(1.56, 1.12).rotateX(-Math.PI / 2).translate(0, FLOOR + 0.003, -0.22),
     new THREE.PlaneGeometry(1.12, 0.44).rotateX(-Math.PI / 2).translate(0.22, FLOOR + 0.003, 0.56),
+    ...SLOPES.map(sl => { const { q, c, w, d } = slopeFrame(sl); return new THREE.PlaneGeometry(w, d).rotateX(-Math.PI / 2).applyQuaternion(q).translate(c.x, c.y + 0.003, c.z); }),
   ]);
   floorMesh = new THREE.Mesh(floorGeo, toon({ color: '#26305e' }));
   floorMesh.receiveShadow = true;
@@ -672,7 +699,15 @@ const sparkTex = canvasTex(128, 128, (g, w, h) => {
 });
 const spark = new THREE.Sprite(new THREE.SpriteMaterial({ map: sparkTex.tex, blending: THREE.AdditiveBlending, depthTest: false, depthWrite: false }));
 spark.renderOrder = 4;
-scene.add(spark);
+// a gold ring of light around tonight's star, drawn over the pile so it shows even when half buried
+const haloTex = canvasTex(128, 128, (g, w, h) => {
+  const r = g.createRadialGradient(w / 2, h / 2, 0, w / 2, h / 2, w / 2);
+  r.addColorStop(0, 'rgba(255,213,107,0)'); r.addColorStop(0.42, 'rgba(255,213,107,0)'); r.addColorStop(0.55, 'rgba(255,213,107,.6)'); r.addColorStop(0.75, 'rgba(255,213,107,.18)'); r.addColorStop(1, 'rgba(255,213,107,0)');
+  g.fillStyle = r; g.fillRect(0, 0, w, h);
+});
+const halo = new THREE.Sprite(new THREE.SpriteMaterial({ map: haloTex.tex, blending: THREE.AdditiveBlending, depthTest: false, depthWrite: false }));
+halo.renderOrder = 3;
+scene.add(spark, halo);
 
 const BULBS = 26;
 const bulbs = new THREE.InstancedMesh(sph(0.02, 8, 6), new THREE.MeshBasicMaterial(), BULBS);
@@ -818,24 +853,35 @@ world.defaultContactMaterial.restitution = 0.05;
 const clawMat = new CANNON.Material('claw'), prizeMat = new CANNON.Material('prize');
 world.addContactMaterial(new CANNON.ContactMaterial(clawMat, prizeMat, { friction: 0.9, restitution: 0 }));
 world.addContactMaterial(new CANNON.ContactMaterial(prizeMat, prizeMat, { friction: 0.5, restitution: 0.1 }));
-function staticBox(x, y, z, hx, hy, hz, tilt = 0) {
-  const b = new CANNON.Body({ mass: 0, shape: new CANNON.Box(new CANNON.Vec3(hx, hy, hz)) });
+// slick slopes and glass, or a prize wedged in a corner or leaning on a wall stays put out of reach
+const slickMat = new CANNON.Material('slick');
+world.addContactMaterial(new CANNON.ContactMaterial(slickMat, prizeMat, { friction: 0.05, restitution: 0 }));
+function staticBox(x, y, z, hx, hy, hz, tilt = 0, material) {
+  const b = new CANNON.Body({ mass: 0, material, shape: new CANNON.Box(new CANNON.Vec3(hx, hy, hz)) });
   b.position.set(x, y, z);
   b.quaternion.setFromEuler(tilt, 0, 0);
   world.addBody(b);
 }
 staticBox(0, 0.65, -0.21, IN, 0.35, 0.55);
 staticBox(0.21, 0.65, 0.55, 0.55, 0.35, 0.21);
-staticBox(-IN - 0.05, 1.2, 0, 0.05, 1.2, IN + 0.1);
-staticBox(IN + 0.05, 1.2, 0, 0.05, 1.2, IN + 0.1);
-staticBox(0, 1.2, -IN - 0.05, IN + 0.1, 1.2, 0.05);
-staticBox(0, 1.2, IN + 0.05, IN + 0.1, 1.2, 0.05);
+staticBox(-IN - 0.05, 1.2, 0, 0.05, 1.2, IN + 0.1, 0, slickMat);
+staticBox(IN + 0.05, 1.2, 0, 0.05, 1.2, IN + 0.1, 0, slickMat);
+staticBox(0, 1.2, -IN - 0.05, IN + 0.1, 1.2, 0.05, 0, slickMat);
+staticBox(0, 1.2, IN + 0.05, IN + 0.1, 1.2, 0.05, 0, slickMat);
 staticBox(0, 2.45, 0, IN + 0.1, 0.05, IN + 0.1);
 staticBox(-0.55, 0.17, 0.55, 0.21, 0.05, 0.26, 0.3);
 staticBox(CHUTE_X + 0.02, 0.2, 0.55, 0.02, 0.2, 0.23);
 staticBox(-0.55, 0.2, CHUTE_Z - 0.02, 0.23, 0.2, 0.02);
 staticBox(CHUTE_X, 1.11, 0.55, 0.015, 0.11, 0.21);
 staticBox(-0.55, 1.11, CHUTE_Z, 0.21, 0.11, 0.015);
+// thin, so the tilted top end of a guard slope does not overhang into the chute mouth
+for (const sl of SLOPES) {
+  const { q, c, w, d } = slopeFrame(sl), n = new V3(0, 1, 0).applyQuaternion(q);
+  const b = new CANNON.Body({ mass: 0, material: slickMat, shape: new CANNON.Box(new CANNON.Vec3(w / 2, 0.01, d / 2)) });
+  b.position.set(c.x - n.x * 0.01, c.y - n.y * 0.01, c.z - n.z * 0.01);
+  b.quaternion.set(q.x, q.y, q.z, q.w);
+  world.addBody(b);
+}
 
 // claw bodies are kinematic: driven by velocity so contacts see real motion
 const CLAW_GROUP = 2, HELD_GROUP = 4;
@@ -913,16 +959,17 @@ function addPrize(kind, x, y, z) {
   const { type } = KINDS[kind];
   const body = new CANNON.Body({ mass: type === 'cap' ? 0.2 : 0.3, material: prizeMat, linearDamping: 0.1, angularDamping: type === 'cap' ? 0.7 : 0.3, sleepSpeedLimit: 0.15, sleepTimeLimit: 0.5 });
   if (type === 'bear' || type === 'cat') {
-    body.addShape(new CANNON.Sphere(0.105));
-    body.addShape(new CANNON.Sphere(0.085), new CANNON.Vec3(0, 0.15, 0));
+    body.addShape(new CANNON.Sphere(0.105 * PS));
+    body.addShape(new CANNON.Sphere(0.085 * PS), new CANNON.Vec3(0, 0.15 * PS, 0));
   } else if (type === 'cap') {
-    body.addShape(new CANNON.Sphere(0.085), new CANNON.Vec3(0, 0.025, 0));
-    body.addShape(new CANNON.Sphere(0.085), new CANNON.Vec3(0, -0.025, 0));
-  } else body.addShape(new CANNON.Box(new CANNON.Vec3(0.085, 0.085, 0.085)));
+    body.addShape(new CANNON.Sphere(0.085 * PS), new CANNON.Vec3(0, 0.025 * PS, 0));
+    body.addShape(new CANNON.Sphere(0.085 * PS), new CANNON.Vec3(0, -0.025 * PS, 0));
+  } else body.addShape(new CANNON.Box(new CANNON.Vec3(0.085 * PS, 0.085 * PS, 0.085 * PS)));
   body.position.set(x, y, z);
   // bias yaw so most faces turn toward the camera
   body.quaternion.setFromEuler(rand(-0.4, 0.4), YAW + rand(-0.5, 0.5), rand(-0.4, 0.4));
   const mesh = inked(new THREE.Mesh(prizeGeo(kind), vcMat));
+  mesh.scale.setScalar(PS);
   mesh.castShadow = true;
   scene.add(mesh);
   world.addBody(body);
@@ -943,15 +990,20 @@ function buildPile() {
   const spots = [];
   for (let layer = 0; layer < 2; layer++)
     for (let ix = 0; ix < 4; ix++) for (let iz = 0; iz < 4; iz++) {
-      const x = -0.55 + ix * 0.37, z = -0.55 + iz * 0.37;
+      const x = -0.5 + ix * 0.33, z = -0.5 + iz * 0.33;
       // keep clear of the chute lip, where the claw cannot reach the floor
       if (!(x < -0.2 && z > 0.1)) spots.push([x + rand(-0.04, 0.04), 1.15 + layer * 0.3, z + rand(-0.04, 0.04)]);
     }
   const rest = [...PILE];
   for (const k of save.bin) { const i = rest.indexOf(k); if (i >= 0) rest.splice(i, 1); }
-  rest.forEach((k, i) => addPrize(k, ...spots[i]));
+  // tonight's star gets the front row, where nothing hides it from the camera and the claw reaches it
+  const si = save.starNight === tonight ? -1 : rest.indexOf(STAR_KIND), at = [rand(0.02, 0.16), 1.15, rand(0.4, 0.46)];
+  starPrize = si >= 0 ? addPrize(...rest.splice(si, 1), ...at) : null;
+  // nothing spawns beside it or in front of it, between it and the camera
+  const free = spots.filter(([x, , z]) => !starPrize || Math.hypot(x - at[0], z - at[2]) > 0.25 && !(x > -0.1 && z > 0.3));
+  rest.forEach((k, i) => addPrize(k, ...free[i]));
   settle(260);
-  starPrize = save.starNight === tonight ? null : prizes.find(p => p.kind === STAR_KIND) || null;
+  if (starPrize) starPrize.mesh.children[0].material = inkGold;
   for (const k of save.bin) { const p = addPrize(k, -0.55, 0.45, 0.55); p.won = true; bin.push(p); }
   settle(60);
 }
@@ -969,7 +1021,7 @@ function settle(n) {
 // ---------- claw state ----------
 const claw = { x: HOME.x, z: HOME.z, y: TOPY, theta: [REST, REST, REST], stall: [null, null, null] };
 const sway = { x: 0, z: 0, vx: 0, vz: 0, lvx: 0, lvz: 0 };
-const game = { state: 'idle', timer: 0, t: 0, wait: 0, dig: null, grabbed: false, slipped: false, touched: false, wonThisPlay: false, payoutUsed: false, lastSec: 0, slack: false };
+const game = { state: 'idle', calm: 0, timer: 0, t: 0, wait: 0, dig: null, grabbed: false, slipped: false, touched: false, wonThisPlay: false, payoutUsed: false, lastSec: 0, slack: false };
 let grip = null;
 let touchAny = false;
 const touchF = [null, null, null];
@@ -1009,7 +1061,12 @@ function placeClaw(teleport = false) {
 const reach = th => 0.035 + 0.2 * Math.cos(th) + 0.045;
 // open fingers reach about 0.12 left and 0.17 forward, so near the chute the guard stops them first
 const guarded = () => inChute(claw.x - 0.12, claw.z + 0.17);
-const minHubY = () => (guarded() ? 1.25 : FLOOR) + reach(Math.min(...claw.theta)) + 0.01;
+// open finger tips land about 0.15 out from the hub, so near a wall they stop on the slope
+function minHubY() {
+  let f = guarded() ? 1.25 : FLOOR;
+  for (const phi of PHIS) f = Math.max(f, floorAt(claw.x + Math.cos(phi) * 0.15, claw.z - Math.sin(phi) * 0.15));
+  return f + reach(Math.min(...claw.theta)) + 0.01;
+}
 function fingersToward(target, rate, dt) {
   claw.theta = claw.theta.map(t => t + clamp(target - t, -rate * dt, rate * dt));
 }
@@ -1019,6 +1076,7 @@ function insertCoin() {
   if (game.state !== 'idle' || save.credits <= 0) return false;
   save.credits--;
   save.inPlay = true;
+  coinAt = performance.now();
   if (save.tut === 0) save.tut = 1;
   persist();
   Object.assign(game, { state: 'aim', timer: AIM_TIME, grabbed: false, slipped: false, touched: false, wonThisPlay: false, payoutUsed: false, lastSec: AIM_TIME });
@@ -1039,8 +1097,8 @@ function freeCredits() {
 }
 function move(dx, dz) {
   if (game.state !== 'aim') return false;
-  claw.x = clamp(claw.x + Math.sign(dx) * 0.06, -LIM, LIM);
-  claw.z = clamp(claw.z + Math.sign(dz) * 0.06, -LIM, LIM);
+  claw.x = clampX(claw.x + Math.sign(dx) * 0.06);
+  claw.z = clampZ(claw.z + Math.sign(dz) * 0.06);
   if (dx || dz) tutMoved();
   return true;
 }
@@ -1082,16 +1140,22 @@ function decideGrip() {
   if (!best) return (game.miss = missTip(hp));
   game.grabbed = true;
   const q = 1 - bestD / 0.12;
+  game.grade = q > 0.75 ? 'PERFECT' : q > 0.4 ? 'GOOD' : 'EDGE';
   const b = best.body;
   const mg = b.mass * 9.82 * STEP;
   const payout = save.since >= save.pity - 1;
   game.payoutUsed = payout && q > 0.25;
   let g;
-  if (save.mode === 'fair') g = q > 0.4 ? { f0: 3, f1: 3, delay: 0, fade: 1, drift: 0.09 } : { f0: 3, f1: 1.12, delay: 0.3, fade: 1.2, drift: 0.05 };
+  // fair: a centered grab always holds; an off-center one holds as often as it was close to centered
+  if (save.mode === 'fair') g = q > 0.4 ? { f0: 3, f1: 3, delay: 0, fade: 1, drift: 0.09 } : { f0: 3, f1: Math.random() < q / 0.4 ? 1.08 : 0.95, delay: 0.3, fade: 1.2, drift: 0.06 };
   else if (payout && q > 0.25) g = { f0: 3, f1: 3, delay: 0, fade: 1, drift: 0.09 };
   // fade ends within 1.8 s, before the lift reaches TOPY; a centered grab is likelier to keep a holding grip
-  // q 0.85 holds ~60%, q 1 ~93%, sloppy aims stay near the 8% floor
-  else g = { f0: 3, f1: Math.random() < 0.08 + 0.85 * q ** 3 ? 1.08 : 0.8, delay: rand(0.3, 1.0), fade: 0.8, drift: 0.05 };
+  // q 0.85 holds ~23%, q 1 ~36%, sloppy aims stay near the 4% floor, so most arcade wins come from the payout grip
+  // a losing grip sags for a moment before it lets go
+  else {
+    const hold = Math.random() < 0.035 + 0.32 * q ** 3;
+    g = { f0: 3, f1: hold ? 1.08 : 0.9, delay: rand(0.3, 1.0), fade: 0.8, drift: 0.07, loose: !hold };
+  }
   b.wakeUp();
   b.allowSleep = false;
   b.collisionFilterGroup = HELD_GROUP;
@@ -1100,8 +1164,9 @@ function decideGrip() {
   grip = { ...g, c, p: best, mg, t: 0, off: b.position.vsub(hp) };
   freezeUntil = performance.now() + 80;
   if (!reduced) tweens.push({ t: 0, dur: 0.2, run: k => { cam.zoom = k < 1 ? 1.04 - 0.04 * k : 1; cam.updateProjectionMatrix(); } });
-  setLED('GOT ONE!');
-  say('Got one');
+  // graded at the grab, so a later slip reads as the grip and not the aim
+  setLED(game.grade === 'EDGE' ? 'EDGE GRAB' : game.grade + '!');
+  toast(`${game.grade} GRAB`, { PERFECT: 'Dead center', GOOD: 'Close to center', EDGE: 'Only caught the edge' }[game.grade]);
 }
 // tell the player which way the claw was off, measured at first touch, before the fingers shove the prize
 function missTip(hp) {
@@ -1116,7 +1181,10 @@ function missTip(hp) {
   bonkRing.position.set(near.hit.x, near.hit.y + 0.01, near.hit.z);
   if (nd < 0.05) return Math.hypot(b.x - hp.x, b.z - hp.z) > 0.08 ? `Dead center, but ${name} squirted out` : `Landed on top of ${name}. Try one lying flat`;
   // screen words that match the stick: ▲ moves the claw to -z, away from the camera
-  const dir = [Math.abs(dx) > nd * 0.4 ? (dx > 0 ? 'right' : 'left') : '', Math.abs(dz) > nd * 0.4 ? (dz > 0 ? 'down' : 'up') : ''].filter(Boolean).join(' and ');
+  const wx = Math.abs(dx) > nd * 0.4 ? Math.sign(dx) : 0, wz = Math.abs(dz) > nd * 0.4 ? Math.sign(dz) : 0;
+  // the claw is already at its limit that way, so better aim would not help
+  if (wx && claw.x === (wx > 0 ? LIM.x1 : LIM.x0) || wz && claw.z === (wz > 0 ? LIM.z1 : LIM.z0)) return `${name} is tucked out of reach. Try another one`;
+  const dir = [wx ? (wx > 0 ? 'right' : 'left') : '', wz ? (wz > 0 ? 'down' : 'up') : ''].filter(Boolean).join(' and ');
   return `Just missed ${name}. Aim a little ${dir}`;
 }
 function gripStep(dt) {
@@ -1133,7 +1201,7 @@ function gripStep(dt) {
     game.slack = true;
     sfx.slip(); buzz(30);
     const name = KINDS[kind].name;
-    toast(pickLine(['Butter fingers!', `${name} waved goodbye`, `${name} wriggled free`]));
+    toast(pickLine(['Butter fingers!', `${name} waved goodbye`, `${name} wriggled free`]), game.grade === 'EDGE' ? 'Edge grabs slip. Center the ring on it' : 'Your aim was good. The grip let go');
     setLED('NOOO!');
     if (!reduced) slowUntil = performance.now() + 500;
   }
@@ -1155,6 +1223,8 @@ function pickLine(pool) {
 function finishPlay() {
   game.state = 'idle';
   game.slack = false;
+  // a prize asleep against the one just lifted would hang in the air, so let the pile settle again
+  for (const p of prizes) p.body.wakeUp();
   // a payout grip that still lost keeps the payout due for the next play
   if (!game.payoutUsed) save.since++;
   let word = bin.length ? 'TAKE PRIZE' : 'INSERT COIN';
@@ -1176,11 +1246,19 @@ function finishPlay() {
   game.payoutUsed = false;
   persist();
   if (save.credits <= 0 && !bin.length) setTimeout(() => game.state === 'idle' && toast('Out of tokens. Tap for 5 free.'), 1600);
+  else setTimeout(starIntro, 2400);
   if (bin.length) word = 'TAKE PRIZE';
   else if (game.wonThisPlay) word = 'INSERT COIN';
   else ledHoldUntil = performance.now() + 1800;
   setLED(word);
   ui();
+}
+// explained once a night, after the first-play tutorial, so it never repeats on every load
+function starIntro() {
+  if (!starPrize || save.starSeen === tonight || save.tut < 3 || game.state !== 'idle' || bin.length) return;
+  save.starSeen = tonight;
+  persist();
+  toast("TONIGHT'S STAR", `Win the gold-glowing ${KINDS[STAR_KIND].name} for a ★ on your shelf`);
 }
 function win(p) {
   p.won = true;
@@ -1224,7 +1302,7 @@ function takePrize() {
     tweens.push({ t: 0, dur: 0.8, run: k => {
       p.mesh.position.lerpVectors(from, new V3(-0.52, 0.55, 1.25), k);
       p.mesh.position.y += Math.sin(k * Math.PI) * 0.35;
-      p.mesh.scale.setScalar(1 + k * 0.6 - (k > 0.7 ? (k - 0.7) * 5.3 : 0));
+      p.mesh.scale.setScalar(PS * (1 + k * 0.6 - (k > 0.7 ? (k - 0.7) * 5.3 : 0)));
     }, done: () => scene.remove(p.mesh) });
     setTimeout(() => {
       if (gen !== pileGen) return;
@@ -1251,6 +1329,7 @@ function takePrize() {
     // repeats skip the modal: a quick toast with progress toward shiny, and the prize flies to the shelf
     const name = KINDS[best.k].name, left = KINDS.length - new Set(save.won).size;
     toast(`${name} ×${best.n}` + (extra ? ` +${extra}` : ''), best.n < SHINY ? `${SHINY - best.n} more for a shiny ${name}` : left ? `Already shiny. ${left} still to find` : 'Already shiny. Full set found');
+    if (!reduced) confetti(fxStage, ...toScreen(-0.52, 0.4, 0.83, fx), 36);
     flyToShelf(best.k, door);
   }, 500);
   if (game.state === 'idle') setLED('INSERT COIN');
@@ -1264,7 +1343,10 @@ function doorPoint() {
   return { x: r.left + (v.x + 1) / 2 * r.width, y: r.top + (1 - v.y) / 2 * r.height };
 }
 function flyToShelf(k, from) {
-  const chip = chips[k], to = chip.getBoundingClientRect(), bump = () => { chip.classList.remove('bump'); void chip.offsetWidth; chip.classList.add('bump'); };
+  const chip = chips[k], to = chip.getBoundingClientRect(), bump = () => {
+    chip.classList.remove('bump'); void chip.offsetWidth; chip.classList.add('bump');
+    if (!reduced) chip.querySelector('i')?.animate([{ transform: 'scale(1)' }, { transform: 'scale(2.2)', color: '#fff3df', offset: 0.3 }, { transform: 'scale(1)' }], { duration: 700, easing: 'ease-out' });
+  };
   if (reduced || !thumbs[k]) return bump();
   const img = new Image();
   img.src = thumbs[k]; img.alt = ''; img.className = 'fly';
@@ -1316,10 +1398,21 @@ function showPrize(k, extra, fullSet, how) {
   dlg.querySelector('.eyebrow').textContent = view ? (shiny ? 'SHINY, ON YOUR SHELF' : 'ON YOUR SHELF') : { star: "★ TONIGHT'S STAR ★", new: 'NEW!', shiny: 'SHINY!' }[how];
   $('prize-meta').textContent = how === 'shiny' ? `${SHINY} of a kind. It glows on your shelf now` : view ? (shiny ? `You have ${n}` : `You have ${n}. ${SHINY - n} more for shiny`) : n === 1 ? `${found} of ${KINDS.length} found` : `You have ${n}`;
   if (how === 'star') $('prize-meta').textContent += '. A star for your shelf';
-  dlg.querySelector('form .pill').textContent = view ? 'Close' : 'Play again';
+  const btn = dlg.querySelector('form .pill');
+  btn.textContent = view ? 'Close' : save.credits > 0 ? 'Play again' : 'Get 5 free tokens';
+  btn.value = view ? '' : 'play';
+  // Escape closes without touching returnValue, so clear the last one
+  dlg.returnValue = '';
   dlg.classList.toggle('gold', how === 'star' || shiny);
   fullSetPending = fullSet;
   flyPending = view ? null : k;
+  // hide any toast at once, without its fade, so none lingers behind the backdrop
+  const t = $('toast');
+  clearTimeout(toastTimer);
+  t.style.transition = 'none';
+  t.classList.remove('on');
+  void t.offsetWidth;
+  t.style.transition = '';
   const v = prizeRenderer();
   if (v.mesh) v.s.remove(v.mesh);
   v.mesh = inked(new THREE.Mesh(prizeGeo(k), vcMat));
@@ -1350,7 +1443,7 @@ function showPrize(k, extra, fullSet, how) {
   };
   spin(t0);
 }
-let resetArmed = 0;
+let resetArmed = 0, coinAt = 0;
 function startOver() {
   releaseGrip();
   Object.assign(save, { credits: 10, won: [], bin: [], since: 0, pity: newPity(), inPlay: false, fullSet: false, stars: [], starNight: 0 });
@@ -1368,11 +1461,12 @@ function startOver() {
 // ---------- per-step logic ----------
 function gameStep(dt) {
   const px = claw.x, pz = claw.z;
+  game.calm = game.state === 'idle' ? game.calm + dt : 0;
   switch (game.state) {
     case 'aim': {
       const d = inputDir(), m = Math.hypot(d.x, d.z) || 1;
-      claw.x = clamp(claw.x + d.x / m * MOVE * dt, -LIM, LIM);
-      claw.z = clamp(claw.z + d.z / m * MOVE * dt, -LIM, LIM);
+      claw.x = clampX(claw.x + d.x / m * MOVE * dt);
+      claw.z = clampZ(claw.z + d.z / m * MOVE * dt);
       if (claw.x !== px || claw.z !== pz) tutMoved();
       fingersToward(REST, 1, dt);
       const sec = Math.max(0, Math.ceil(game.timer));
@@ -1422,7 +1516,8 @@ function gameStep(dt) {
       else if (!grip) claw.theta = claw.theta.map((t, i) => (touchF[i] ? t : Math.max(SHUT, t - 0.6 * dt)));
       else if (grip.f1 < 1.5) {
         const k = clamp((grip.t - grip.delay) / grip.fade, 0, 1);
-        claw.theta = claw.theta.map((t, i) => Math.max(t, (claw.stall[i] ?? SHUT) + 0.12 * k));
+        // a losing arcade grip opens wider, so the prize slides out instead of resting on the finger tips
+        claw.theta = claw.theta.map((t, i) => Math.max(t, (claw.stall[i] ?? SHUT) + (grip.loose ? 0.22 : 0.12) * k));
       }
       if (game.state === 'lift') {
         claw.y = Math.min(TOPY, claw.y + LIFT_V * dt);
@@ -1480,14 +1575,11 @@ function afterStep(dt) {
     const b = p.body.position;
     if (p.ghost > 0 && (p.ghost -= dt) <= 0) p.body.collisionFilterGroup = 1;
     if (!p.won && b.y < 0.85 && inChute(b.x, b.z)) win(p);
-    // the floor slopes away from the chute lip, where the guard stops the claw short of the floor
-    if (!p.won && p !== grip?.p && b.y < 1.2 && b.x < -0.2 && b.z > 0.1 && !inChute(b.x, b.z) && game.state !== 'descend' && game.state !== 'close') {
-      const v = p.body.velocity;
-      if (v.x < 0.21 || v.z > -0.21) { p.body.wakeUp(); v.x = Math.max(v.x, 0.21); v.z = Math.min(v.z, -0.21); }
-    }
     // round capsules have no rolling resistance and never drop below cannon's sleep limit on their own
     const v = p.body.velocity, w = p.body.angularVelocity;
-    if (p.body.allowSleep && p.body.sleepState !== CANNON.Body.SLEEPING && v.lengthSquared() < 4e-4 && w.lengthSquared() < 0.25) {
+    // after 2 s idle, also rest the slow creep of stacked boxes and capsules rocking in a slope's corner
+    const calm = game.calm > 2;
+    if (p.body.allowSleep && p.body.sleepState !== CANNON.Body.SLEEPING && v.lengthSquared() < (calm ? 0.01 : 4e-4) && w.lengthSquared() < (calm ? 1 : 0.25)) {
       if ((p.still = (p.still || 0) + dt) > 0.5) { v.setZero(); w.setZero(); p.body.sleep(); p.still = 0; }
     } else p.still = 0;
     if (b.y < -1 || Math.abs(b.x) > 1.2 || Math.abs(b.z) > 1.2) {
@@ -1547,8 +1639,8 @@ function tapNudge() {
   if (game.state !== 'aim' || !d || performance.now() - d.t > 150 || !(d.dx || d.dz)) return;
   const m = Math.hypot(d.dx, d.dz), ux = d.dx / m, uz = d.dz / m;
   if ((claw.x - d.x) * ux + (claw.z - d.z) * uz >= 0.03) return;
-  claw.x = clamp(d.x + ux * 0.03, -LIM, LIM);
-  claw.z = clamp(d.z + uz * 0.03, -LIM, LIM);
+  claw.x = clampX(d.x + ux * 0.03);
+  claw.z = clampZ(d.z + uz * 0.03);
   tutMoved();
   sfx.tick(); buzz(8);
 }
@@ -1560,6 +1652,8 @@ stick.addEventListener('contextmenu', e => e.preventDefault());
 
 function pressDrop() {
   if (game.state === 'idle') return bin.length ? takePrize() : save.credits > 0 ? insertCoin() : freeCredits();
+  // a double tap from idle would insert a coin and drop at the home corner in one go
+  if (game.state === 'aim' && performance.now() - coinAt < 400) return;
   if (!drop()) toast('The claw is already on its way');
 }
 const dropBtn = $('drop');
@@ -1587,6 +1681,7 @@ $('prize').addEventListener('close', () => {
   if (flyPending !== null) { const r = $('prize-view').getBoundingClientRect(); flyToShelf(flyPending, { x: r.left + r.width / 2, y: r.top + r.height / 2 }); flyPending = null; }
   (prizeReturn || dropBtn).focus({ preventScroll: true });
   prizeReturn = null;
+  if ($('prize').returnValue === 'play' && !bin.length) { if (save.credits <= 0) freeCredits(); insertCoin(); }
   if (fullSetPending) { fullSetPending = false; toast('Full set! Every prize found'); }
 });
 $('reset').addEventListener('click', () => {
@@ -1688,6 +1783,8 @@ const buzz = p => { try { if (navigator.userActivation?.hasBeenActive !== false)
 let toastTimer;
 const say = text => { $('sr').textContent = text; };
 function toast(text, sub) {
+  // the modal says it all; a toast would sit behind its backdrop
+  if ($('prize').open) return;
   const t = $('toast');
   if (sub) {
     const a = document.createElement('span'), b = document.createElement('span');
@@ -1735,6 +1832,7 @@ function ui() {
   $('drop').classList.toggle('guide', game.state === 'aim' && save.tut === 2);
   $('hint').textContent = bin.length ? 'or tap the door' : save.mode === 'fair' ? 'Aim decides' : '1 token per play';
   $('mode').textContent = save.mode === 'fair' ? 'Fair grip' : 'Arcade grip';
+  $('led').style.setProperty('--grip', save.mode === 'arcade' ? Math.min(1, (save.since + 1) / save.pity) : 0);
   $('mute').setAttribute('aria-pressed', String(!save.muted));
   $('mute').setAttribute('aria-label', save.muted ? 'Sound off' : 'Sound on');
   doorLabel.redraw(bin.length > 0);
@@ -1777,21 +1875,34 @@ function shelfTap(i, c) {
 // ---------- layout ----------
 const stage = $('stage'), fx = $('fx'), fxg = fx.getContext('2d');
 const CABLE_W = 1.7;
+let cabView = null;
+const v3 = new V3();
 function fit() {
   const w = stage.clientWidth, h = stage.clientHeight;
   if (!w || !h) return;
   renderer.setSize(w, h, false);
   fx.width = Math.round(w * pixelRatio); fx.height = Math.round(h * pixelRatio);
   cam.updateMatrixWorld();
-  const box = new THREE.Box3().setFromObject(cabinet), b = new THREE.Box3(), v = new V3();
-  for (const x of [box.min.x, box.max.x]) for (const y of [box.min.y, box.max.y]) for (const z of [box.min.z, box.max.z])
-    b.expandByPoint(v.set(x, y, z).applyMatrix4(cam.matrixWorldInverse));
-  const a = w / h, pad = 1.04;
+  // fit the cabinet's real outline; its bounding box corners overshoot by about 7%, which shrinks the prizes on a phone
+  if (!cabView) {
+    cabView = new THREE.Box3();
+    const v = new V3();
+    cabinet.updateMatrixWorld(true);
+    cabinet.traverse(o => {
+      if (!o.isMesh || o.isInstancedMesh) return;
+      const pos = o.geometry.attributes.position;
+      for (let i = 0; i < pos.count; i++) cabView.expandByPoint(v.fromBufferAttribute(pos, i).applyMatrix4(o.matrixWorld).applyMatrix4(cam.matrixWorldInverse));
+    });
+  }
+  const b = cabView, a = w / h, pad = 1.02;
   let hw = (b.max.x - b.min.x) * pad / 2, hh = (b.max.y - b.min.y) * pad / 2;
   if (hw / hh > a) hh = hw / a; else hw = hh * a;
   const cx = (b.max.x + b.min.x) / 2, cy = (b.max.y + b.min.y) / 2;
   Object.assign(cam, { left: cx - hw, right: cx + hw, top: cy + hh, bottom: cy - hh });
   cam.updateProjectionMatrix();
+  // toasts sit just under the marquee's lowest corner so they never cover the sign
+  const signLow = Math.min(...[-0.87, 0.87].flatMap(x => [-0.89, -0.72].map(z => v3.set(x, 2.44, z).project(cam).y)));
+  stage.style.setProperty('--toast-top', `${Math.round((1 - signLow) / 2 * h + 6)}px`);
   needRender = true;
 }
 new ResizeObserver(fit).observe(stage);
@@ -1871,14 +1982,17 @@ function syncVisuals(now, dt) {
   }
 
   if (target !== hot) {
-    if (hot) { hot.children[0].material = inkMat; hot.children[0].scale.setScalar(1); }
+    if (hot) { hot.children[0].material = hot === starPrize?.mesh ? inkGold : inkMat; hot.children[0].scale.setScalar(1); }
     if ((hot = target)) { hot.children[0].material = inkHot; hot.children[0].scale.setScalar(1.08); }
   }
   bonkRing.visible = now < bonkUntil;
   if (bonkRing.visible) bonkRing.scale.setScalar(reduced ? 1 : 1.6 - (bonkUntil - now) / 600);
-  spark.visible = !!starPrize;
+  spark.visible = halo.visible = !!starPrize;
   if (starPrize) {
-    spark.position.copy(starPrize.body.position).y += KINDS[starPrize.kind].type === 'bear' || KINDS[starPrize.kind].type === 'cat' ? 0.3 : 0.17;
+    const plush = KINDS[starPrize.kind].type === 'bear' || KINDS[starPrize.kind].type === 'cat';
+    halo.position.copy(starPrize.mesh.position).y += (plush ? 0.08 : 0) * PS;
+    halo.scale.setScalar((plush ? 0.62 : 0.48) * (reduced ? 1 : 1 + Math.sin(now / 400) * 0.05));
+    spark.position.copy(starPrize.body.position).y += (plush ? 0.3 : 0.17) * PS;
     spark.scale.setScalar(reduced ? 0.22 : 0.21 + Math.sin(now / 260) * 0.04);
     spark.material.rotation = reduced ? 0 : now / 1400;
   }
@@ -1933,8 +2047,9 @@ function frame(now) {
   const motor = game.state === 'aim' ? (moving.x || moving.z ? 0.03 : 0) : ['descend', 'lift', 'carry', 'return'].includes(game.state) ? 0.022 : 0;
   setHum(motor);
 
-  const awake = prizes.some(p => p.body.sleepState !== CANNON.Body.SLEEPING && (p.body.velocity.lengthSquared() > 1e-4 || p.body.angularVelocity.lengthSquared() > 1e-2));
-  if (!(needRender || awake || game.state !== 'idle' || tweens.length || now - lastRender > 120)) return;
+  // settling jitter below a few pixels a second is not worth a frame; idle attract lights tick at about 4 fps
+  const calm = game.calm > 2, awake = prizes.some(p => p.body.sleepState !== CANNON.Body.SLEEPING && (p.body.velocity.lengthSquared() > (calm ? 0.01 : 4e-4) || p.body.angularVelocity.lengthSquared() > (calm ? 1 : 0.04)));
+  if (!(needRender || awake || game.state !== 'idle' || tweens.length || now - lastRender > 240)) return;
   syncVisuals(now, dtr);
   const shake = now < shakeUntil ? (shakeUntil - now) / 300 * 0.02 : 0;
   if (shake) cam.position.copy(camBase).add(new V3(rand(-1, 1), rand(-1, 1), rand(-1, 1)).normalize().multiplyScalar(shake * Math.random()));
@@ -1960,7 +2075,7 @@ fit();
 setTimeout(makeThumbs, 300);
 document.fonts?.load(`40px Bungee`).then(() => { marquee.redraw(); doorLabel.redraw(bin.length > 0); sideTex.redraw(); ledTex.redraw(ledText || 'INSERT COIN', true); needRender = true; }).catch(() => {});
 if (bin.length) setLED('TAKE PRIZE');
-else if (starPrize && save.tut === 3 && !refunded) setTimeout(() => game.state === 'idle' && toast("TONIGHT'S STAR", `${KINDS[STAR_KIND].name} sparkles in the pile`), 1200);
+else if (!refunded) setTimeout(starIntro, 1200);
 requestAnimationFrame(frame);
 
 window.crane = {
